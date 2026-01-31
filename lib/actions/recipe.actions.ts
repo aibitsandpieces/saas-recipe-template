@@ -5,16 +5,23 @@ import { auth, clerkClient } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { createSupabaseClient } from "../supabase";
+import { getCurrentUser, requireUserWithOrg } from "../auth/user";
 
-// Get all recipes, with author details and unlocked status for current user
+// Get all recipes in the current user's organisation, with author details and unlocked status
 export const getRecipes = async () => {
-  const { userId } = await auth(); // Get the current user (can be null if not signded in)
-  const supabase = await createSupabaseClient(); // Initialize supabase client
+  const user = await getCurrentUser();
+  if (!user || !user.organisationId) {
+    // Return empty array for users without organisation context
+    return [];
+  }
 
-  // Get all recipes from the database
+  const supabase = await createSupabaseClient();
+
+  // Get all recipes from the user's organisation
+  // RLS policies will automatically filter by organisation_id from JWT claims
   const { data: recipes, error } = await supabase
     .from("recipes")
-    .select("id, name, ingredients, user_id");
+    .select("id, name, ingredients, user_id, organisation_id");
 
   if (error) throw new Error(error.message);
 
@@ -22,57 +29,59 @@ export const getRecipes = async () => {
   const userIds = recipes.map((recipe) => recipe.user_id);
 
   const clerk = await clerkClient();
-  const users = await clerk.users.getUserList({ userId: userIds }); // Get users data for the recipe authors
+  const users = await clerk.users.getUserList({ userId: userIds });
 
-  // Get unlocked recipes for current user
+  // Get unlocked recipes for current user within their organisation
   const { data: unlockedRecipes, error: unlockedError } = await supabase
     .from("recipes_unlocked")
     .select("recipe_id")
-    .eq("user_id", userId);
+    .eq("user_id", user.clerkId);
 
   if (unlockedError) throw new Error(unlockedError.message);
 
-  const unlockedRecipeIds = new Set(unlockedRecipes.map((r) => r.recipe_id)); // Store the unlocked recipe ids in a set for O(1) lookup
+  const unlockedRecipeIds = new Set(unlockedRecipes.map((r) => r.recipe_id));
 
   // Merge all data
   const recipesWithUserDetails = recipes.map((recipe) => {
-    const user = users.data.find((user) => user.id === recipe.user_id);
+    const recipeUser = users.data.find((u) => u.id === recipe.user_id);
     return {
       ...recipe,
-      userFirstName: user?.firstName,
-      userImageUrl: user?.imageUrl,
-      unlocked: unlockedRecipeIds.has(recipe.id) || recipe.user_id === userId, // Check if the recipe is unlocked or the user is the author to grant access
+      userFirstName: recipeUser?.firstName,
+      userImageUrl: recipeUser?.imageUrl,
+      unlocked: unlockedRecipeIds.has(recipe.id) || recipe.user_id === user.clerkId,
     };
   });
 
-  return recipesWithUserDetails; // Return the recipes with user details and unlocked status
+  return recipesWithUserDetails;
 };
 
-// Get a single recipe by id, with author details and unlocked status for current user
+// Get a single recipe by id within the user's organisation
 export const getRecipe = async (id: string) => {
-  const { userId } = await auth();
+  const user = await getCurrentUser();
 
-  if (!userId) throw new Error("Unauthorized");
+  if (!user || !user.organisationId) {
+    throw new Error("Unauthorized: User not assigned to organisation");
+  }
 
   const supabase = await createSupabaseClient();
 
-  // Fetch the recipe first
+  // Fetch the recipe (RLS will automatically filter by organisation)
   const { data: recipeData, error: recipeError } = await supabase
     .from("recipes")
     .select()
     .eq("id", id)
-    .single(); // since we're expecting only one row
+    .single();
 
   if (recipeError) throw new Error(recipeError.message);
 
   // If the user is the author, return the recipe directly
-  if (recipeData.user_id === userId) return recipeData;
+  if (recipeData.user_id === user.clerkId) return recipeData;
 
   // Otherwise check if the recipe is unlocked for this user
   const { data: unlockedRecipe, error: unlockedError } = await supabase
     .from("recipes_unlocked")
     .select()
-    .eq("user_id", userId)
+    .eq("user_id", user.clerkId)
     .eq("recipe_id", id);
 
   if (unlockedError) throw new Error(unlockedError.message);
@@ -83,11 +92,9 @@ export const getRecipe = async (id: string) => {
   return recipeData;
 };
 
-// Create a new recipe
+// Create a new recipe within the user's organisation
 export const createRecipe = async (recipe: Recipe) => {
-  const { userId } = await auth();
-
-  if (!userId) throw new Error("Unauthorized");
+  const { user, organisationId } = await requireUserWithOrg();
 
   const supabase = await createSupabaseClient();
 
@@ -97,45 +104,50 @@ export const createRecipe = async (recipe: Recipe) => {
       name: recipe.name,
       ingredients: recipe.ingredients,
       instructions: recipe.instructions,
-      user_id: userId,
+      user_id: user.clerkId,
+      organisation_id: organisationId,
     })
     .select();
 
   if (error) throw new Error(error.message);
 
-  return data[0]; // Return the created recipe so we can redirect to it
+  return data[0];
 };
 
-// Get all recipes created by the current user
+// Get all recipes created by the current user within their organisation
 export const getUserRecipes = async () => {
-  const { userId } = await auth();
+  const user = await getCurrentUser();
 
-  if (!userId) throw new Error("Unauthorized");
+  if (!user || !user.organisationId) {
+    throw new Error("Unauthorized: User not assigned to organisation");
+  }
 
   const supabase = await createSupabaseClient();
 
   const { data, error } = await supabase
     .from("recipes")
     .select("*")
-    .eq("user_id", userId);
+    .eq("user_id", user.clerkId);
 
   if (error) throw new Error(error.message);
 
   return data;
 };
 
-// Get all recipes unlocked by the current user
+// Get all recipes unlocked by the current user within their organisation
 export const getUnlockedRecipes = async () => {
-  const { userId } = await auth();
+  const user = await getCurrentUser();
 
-  if (!userId) throw new Error("Unauthorized");
+  if (!user || !user.organisationId) {
+    throw new Error("Unauthorized: User not assigned to organisation");
+  }
 
   const supabase = await createSupabaseClient();
 
   const { data, error } = await supabase
     .from("recipes_unlocked")
     .select("recipes:recipe_id (*)")
-    .eq("user_id", userId);
+    .eq("user_id", user.clerkId);
 
   if (error) throw new Error(error.message);
 
@@ -144,11 +156,10 @@ export const getUnlockedRecipes = async () => {
   return recipes;
 };
 
-// Unlock a recipe for the current user
+// Unlock a recipe for the current user within their organisation
 export const unlockRecipe = async (recipeId: string) => {
-  const { userId, has } = await auth();
-
-  if (!userId) redirect("/sign-in");
+  const { has } = await auth();
+  const { user, organisationId } = await requireUserWithOrg();
 
   const supabase = await createSupabaseClient();
 
@@ -168,11 +179,11 @@ export const unlockRecipe = async (recipeId: string) => {
     );
   }
 
-  // Check how many recipes the user has unlocked
+  // Check how many recipes the user has unlocked in their organisation
   const { count, error: countError } = await supabase
     .from("recipes_unlocked")
     .select("*", { count: "exact", head: true })
-    .eq("user_id", userId);
+    .eq("user_id", user.clerkId);
 
   if (countError) throw new Error(countError.message);
 
@@ -181,10 +192,14 @@ export const unlockRecipe = async (recipeId: string) => {
     return { success: false, message: "limit reached" };
   }
 
-  // Unlock the recipe
+  // Unlock the recipe within the user's organisation
   const { error } = await supabase
     .from("recipes_unlocked")
-    .insert({ user_id: userId, recipe_id: recipeId });
+    .insert({
+      user_id: user.clerkId,
+      recipe_id: recipeId,
+      organisation_id: organisationId
+    });
 
   if (error) throw new Error(error.message);
 
