@@ -34,22 +34,50 @@ export async function getCurrentUser(): Promise<UserContext | null> {
 
   const supabase = await createSupabaseClient();
 
-  const { data: user, error } = await supabase
+  // Get basic user info
+  const { data: user, error: userError } = await supabase
     .from("users")
-    .select(`
-      id,
-      clerk_id,
-      organisation_id,
-      email,
-      name,
-      user_roles(role:roles(name))
-    `)
+    .select("id, clerk_id, organisation_id, email, name")
     .eq("clerk_id", userId)
     .single();
 
-  if (error || !user) {
-    console.error("Error fetching user:", error);
+  if (userError || !user) {
+    console.error("Error fetching user:", userError);
     return null;
+  }
+
+  // Get user's role IDs
+  const { data: userRoles, error: userRolesError } = await supabase
+    .from("user_roles")
+    .select("role_id")
+    .eq("user_id", user.id);
+
+  if (userRolesError) {
+    console.error("Error fetching user roles:", userRolesError);
+    return {
+      id: user.id,
+      clerkId: user.clerk_id,
+      organisationId: user.organisation_id,
+      email: user.email,
+      name: user.name,
+      roles: []
+    };
+  }
+
+  // Get role names
+  let roles: string[] = [];
+  if (userRoles && userRoles.length > 0) {
+    const roleIds = userRoles.map(ur => ur.role_id);
+    const { data: roleData, error: rolesError } = await supabase
+      .from("roles")
+      .select("name")
+      .in("id", roleIds);
+
+    if (rolesError) {
+      console.error("Error fetching role names:", rolesError);
+    } else {
+      roles = roleData?.map(r => r.name) || [];
+    }
   }
 
   return {
@@ -58,7 +86,7 @@ export async function getCurrentUser(): Promise<UserContext | null> {
     organisationId: user.organisation_id,
     email: user.email,
     name: user.name,
-    roles: user.user_roles?.map((ur: any) => ur.role?.name) || []
+    roles: roles
   };
 }
 

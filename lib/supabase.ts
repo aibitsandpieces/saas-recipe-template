@@ -10,6 +10,7 @@ export const createSupabaseClient = async () => {
     {
       accessToken: async () => {
         // Use the native Supabase third-party auth integration with Clerk
+        // Session customization applies to all tokens automatically
         return await getToken();
       },
     }
