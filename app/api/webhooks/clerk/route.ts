@@ -131,7 +131,8 @@ async function handleUserCreated(clerkUser: any, supabase: any) {
         }
 
         // Update Clerk metadata with role information
-        await clerkClient.users.updateUser(clerkUser.id, {
+        const clerk = await clerkClient();
+        await clerk.users.updateUser(clerkUser.id, {
           publicMetadata: {
             organisation_id: orgId,
             role: "org_member"
@@ -199,7 +200,8 @@ async function handleUserUpdated(clerkUser: any, supabase: any) {
       }
 
       // Update Clerk metadata
-      await clerkClient.users.updateUser(clerkUser.id, {
+      const clerk = await clerkClient();
+      await clerk.users.updateUser(clerkUser.id, {
         publicMetadata: {
           organisation_id: userData.organisation_id,
           role: primaryRole

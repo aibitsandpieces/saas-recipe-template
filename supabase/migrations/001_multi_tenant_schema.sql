@@ -64,7 +64,7 @@ ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
 
 -- ORGANISATIONS POLICIES
 CREATE POLICY "platform_admins_see_all_orgs" ON organisations FOR ALL
-TO authenticated USING ((auth.jwt() ->> 'role') = 'platform_admin');
+TO authenticated USING ((auth.jwt() ->> 'user_role') = 'platform_admin');
 
 CREATE POLICY "users_see_own_org" ON organisations FOR SELECT
 TO authenticated USING (id = (auth.jwt() ->> 'org_id')::uuid);
@@ -74,11 +74,11 @@ CREATE POLICY "users_see_own_record" ON users FOR SELECT
 TO authenticated USING (clerk_id = auth.jwt() ->> 'sub');
 
 CREATE POLICY "platform_admins_manage_all_users" ON users FOR ALL
-TO authenticated USING ((auth.jwt() ->> 'role') = 'platform_admin');
+TO authenticated USING ((auth.jwt() ->> 'user_role') = 'platform_admin');
 
 CREATE POLICY "org_admins_see_org_users" ON users FOR SELECT
 TO authenticated USING (
-  (auth.jwt() ->> 'role') = 'org_admin'
+  (auth.jwt() ->> 'user_role') = 'org_admin'
   AND organisation_id = (auth.jwt() ->> 'org_id')::uuid
 );
 
@@ -93,11 +93,11 @@ TO authenticated USING (user_id IN (
 ));
 
 CREATE POLICY "platform_admins_manage_all_roles" ON user_roles FOR ALL
-TO authenticated USING ((auth.jwt() ->> 'role') = 'platform_admin');
+TO authenticated USING ((auth.jwt() ->> 'user_role') = 'platform_admin');
 
 CREATE POLICY "org_admins_manage_org_roles" ON user_roles FOR ALL
 TO authenticated USING (
-  (auth.jwt() ->> 'role') = 'org_admin'
+  (auth.jwt() ->> 'user_role') = 'org_admin'
   AND organisation_id = (auth.jwt() ->> 'org_id')::uuid
 );
 

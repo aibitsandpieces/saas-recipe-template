@@ -7,6 +7,7 @@ export interface Recipe {
   ingredients: string[];
   instructions: string;
   user_id?: string;
+  organisation_id?: string;
   // Extended properties added by server actions
   userFirstName?: string;
   userImageUrl?: string;
@@ -19,6 +20,7 @@ export interface Comment {
   comment: string;
   user_id: string;
   recipe_id: string;
+  organisation_id?: string;
   // Extended properties added by server actions
   userFirstName?: string;
   userImageUrl?: string;
@@ -29,4 +31,5 @@ export interface RecipeUnlocked {
   created_at?: string;
   recipe_id: string;
   user_id: string;
+  organisation_id?: string;
 }

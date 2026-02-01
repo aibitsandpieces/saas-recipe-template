@@ -29,7 +29,20 @@
       "Bash(git remote set-url:*)",
       "Bash(move \"saas-template\" \"AI Potential Portal\")",
       "Bash(node:*)",
-      "Bash(del:*)"
+      "Bash(del:*)",
+      "Bash(supabase db push:*)",
+      "Bash(tasklist:*)",
+      "Bash(pkill:*)",
+      "Bash(gh pr create:*)",
+      "Skill(code-review:code-review)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc:*)",
+      "Bash(git remote:*)",
+      "Bash(supabase --version:*)",
+      "Bash(ls:*)",
+      "Bash(psql:*)",
+      "Bash(npx supabase --version)",
+      "Bash(npx supabase status)"
     ]
   }
 }
