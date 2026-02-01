@@ -1,142 +1,219 @@
+# Multi-Tenant SaaS Template
+
 <div align="center">
-  <br />
-    <a href="https://jsmastery.com/course/build-launch-your-saas-in-under-7-days" target="_blank">
-      <img src="public/readme/hero.png" alt="Project Banner">
-    </a>
-  <br />
+  <h3 align="center">Production-Ready Multi-Tenant SaaS Foundation</h3>
 
   <div>
     <img src="https://img.shields.io/badge/-Next.JS-black?style=for-the-badge&logoColor=white&logo=nextdotjs&color=black" alt="next.js" />
-        <img src="https://img.shields.io/badge/-Tailwind-00BCFF?style=for-the-badge&logo=tailwind-css&logoColor=white" />
-    <img src="https://img.shields.io/badge/-Clerk-6C47FF?style=for-the-badge&logoColor=white&logo=clerk" alt="next.js" />
+    <img src="https://img.shields.io/badge/-TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="typescript" />
+    <img src="https://img.shields.io/badge/-Tailwind-00BCFF?style=for-the-badge&logo=tailwind-css&logoColor=white" />
+    <img src="https://img.shields.io/badge/-Clerk-6C47FF?style=for-the-badge&logoColor=white&logo=clerk" alt="clerk" />
     <img src="https://img.shields.io/badge/-Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" />
   </div>
 
-  <h3 align="center">SaaS App - LMS with Next.js, Supabase & Payments</h3>
-
-   <div align="center">
-     Build this project step by step with our detailed tutorial on <a href="https://jsmastery.com/course/build-launch-your-saas-in-under-7-days" target="_blank"><b>JavaScript Mastery</b></a> platform. Join the JSM family!
-    </div>
+  <p align="center">
+    A complete, tested, production-ready foundation for building multi-tenant SaaS applications with organization isolation, role-based access control, and modern authentication.
+  </p>
 </div>
 
-## 📋 <a name="table">Table of Contents</a>
+## 📋 Table of Contents
 
 1. 🤖 [Introduction](#introduction)
 2. ⚙️ [Tech Stack](#tech-stack)
 3. 🔋 [Features](#features)
-4. 🤸 [Quick Start](#quick-start)
-5. 🔗 [Assets](#links)
-6. 🚀 [More](#more)
+4. 🏗️ [Architecture](#architecture)
+5. 🚀 [Quick Start](#quick-start)
+6. 📚 [Documentation](#documentation)
+7. 🔧 [Customization](#customization)
 
-## 🚨 Tutorial
+## 🤖 Introduction
 
-This repository contains the code corresponding to an in-depth tutorial available on our Platform, <a href="https://jsmastery.com/" target="_blank"><b>JS Mastery Pro</b></a>.
+This is a **battle-tested multi-tenant SaaS foundation** that provides everything you need to build scalable SaaS applications with proper organization isolation, role-based permissions, and enterprise-grade security.
 
-## <a name="introduction">🤖 Introduction</a>
+**What makes this special:**
+- ✅ **Fully implemented multi-tenant architecture** with organization data isolation
+- ✅ **3-role RBAC system** (platform_admin, org_admin, org_member)
+- ✅ **Production-tested** authentication and authorization flows
+- ✅ **Row Level Security (RLS)** policies for data protection
+- ✅ **Comprehensive testing plan** and documentation
+- ✅ **Ready to customize** for any business domain
 
-Supercharge your SaaS app launch with this high-powered template – packed with built-in user auth, subscriptions, and payments using Next.js, Supabase, and Stripe! Hit the ground running and turn your idea into reality faster than ever.
+## ⚙️ Tech Stack
 
-If you're getting started and need assistance or face any bugs, join our active Discord community with over **50k+** members. It's a place where people help each other out.
+- **[Next.js 16.1.6](https://nextjs.org/)** - React framework with App Router and Server Components
+- **[TypeScript 5.x](https://www.typescriptlang.org/)** - Type safety and better developer experience
+- **[Clerk](https://clerk.com/)** - Authentication, user management, and subscription billing
+- **[Supabase](https://supabase.com/)** - PostgreSQL database with real-time features and RLS
+- **[shadcn/ui](https://ui.shadcn.com/)** - Modern component library built on Radix UI
+- **[Tailwind CSS 4.x](https://tailwindcss.com/)** - Utility-first CSS framework
+- **[Zod](https://zod.dev/)** - TypeScript-first schema validation
 
-<a href="https://discord.com/invite/n6EdbFJ" target="_blank"><img src="https://github.com/sujatagunale/EasyRead/assets/151519281/618f4872-1e10-42da-8213-1d69e486d02e" /></a>
+## 🔋 Features
 
-## <a name="tech-stack">⚙️ Tech Stack</a>
+### 🏢 Multi-Tenant Architecture
+- **Organization isolation** - Complete data separation between organizations
+- **Cross-organization access control** - Platform admins can access all data
+- **Scalable database design** - Optimized for performance at scale
 
-- **[Clerk](https://jsm.dev/converso-clerk)** is a unified platform for authentication, user management, and billing. It offers embeddable UI components, flexible APIs, and admin dashboards for secure user management. Clerk also simplifies subscription management, allowing you to define plans, create pricing pages, and control access based on subscription tiers—all in one solution.
+### 👥 Role-Based Access Control (RBAC)
+- **Platform Admin** - Global access across all organizations
+- **Organization Admin** - Administrative access within their organization
+- **Organization Member** - Standard user access within their organization
 
-* **[Next.js](https://nextjs.org/)** is a powerful React framework that enables the development of fast, scalable web applications with features like server-side rendering, static site generation, and API routes for building full-stack applications.
+### 🔐 Enterprise-Grade Security
+- **JWT-based authentication** with custom claims
+- **Row Level Security (RLS)** policies in PostgreSQL
+- **Third-party auth integration** (Clerk + Supabase OIDC)
+- **Comprehensive security testing** - Tested for common vulnerabilities
 
-* **[shadcn/ui](https://ui.shadcn.com/)** is a customizable component library built on Radix UI and Tailwind CSS. It offers a modern, accessible design system with pre-built components that are easy to theme and extend, making it ideal for building polished UIs with minimal effort.
+### 🚀 Developer Experience
+- **Type-safe database operations** with TypeScript
+- **Server Actions** for secure backend operations
+- **Modern React patterns** with hooks and components
+- **Comprehensive documentation** and setup guides
 
-- **[Supabase](https://supabase.com/)** is an open-source backend-as-a-service platform that provides instant APIs, real-time subscriptions, authentication, storage, and a PostgreSQL database, enabling developers to build scalable and secure applications with ease.
+### 📱 Production Ready
+- **Responsive design** works on all devices
+- **Performance optimized** with Next.js 16.1.6 and Turbopack
+- **Error handling** and user feedback systems
+- **Testing framework** with validation procedures
 
-* **[Tailwind CSS](https://tailwindcss.com/)** is a utility-first CSS framework that allows developers to design custom user interfaces by applying low-level utility classes directly in HTML, streamlining the design process.
+## 🏗️ Architecture
 
-* **[TypeScript](https://www.typescriptlang.org/)** is a superset of JavaScript that adds static typing, providing better tooling, code quality, and error detection for developers, making it ideal for building large-scale applications.
-
-* **[Zod](https://zod.dev/)** is a TypeScript-first schema validation library that provides a simple and expressive way to define and validate data structures. Zod ensures data integrity by catching errors early during development.
-
-## <a name="features">🔋 Features</a>
-
-👉 **Authentication**: Secure user sign-up and sign-in with Clerk; Google authentication and many more.
-
-👉 **Billing & Subscriptions**: Easily manage plans, upgrades, and payment details.
-
-👉 **Code Reusability**: Leverage reusable components and a modular codebase for efficient development.
-
-👉 **Cross-Device Compatibility**: Fully responsive design that works seamlessly across all devices.
-
-👉 **Database Integration**: Uses Supabase for real-time data handling and storage needs.
-
-👉 **No opinionated UI**: Easily bring your own style to the app, without the need for removing leftover styles.
-
-👉 **Scalable Tech Stack**: Built with Next.js for a fast, production-ready web application that scales seamlessly.
-
-## <a name="quick-start">🤸 Quick Start</a>
-
-Follow these steps to set up the project locally on your machine.
-
-**Prerequisites**
-
-Make sure you have the following installed on your machine:
-
-- [Git](https://git-scm.com/)
-- [Node.js](https://nodejs.org/en)
-- [npm](https://www.npmjs.com/) (Node Package Manager)
-
-**Cloning the Repository**
-
-```bash
-git clone https://github.com/JavaScript-Mastery-Pro/saas-template.git
-cd saas-template
+### Multi-Tenant Database Design
+```sql
+organisations    # Organization entities
+├── users        # User profiles (synced via webhooks)
+├── roles        # RBAC role definitions
+├── user_roles   # Role assignments
+└── [your_data] # Your business entities (auto-scoped to organization)
 ```
 
-**Installation**
+### Authentication Flow
+```
+User Sign-in → Clerk JWT → Custom Claims → Supabase RLS → Organization-Scoped Data
+```
 
-Install the project dependencies using npm:
+### Security Model
+- **JWT tokens** contain `org_id` and `user_role` claims
+- **RLS policies** automatically filter data by organization
+- **Server actions** validate user context before operations
+- **Middleware protection** on all routes
 
+## 🚀 Quick Start
+
+### Prerequisites
+- [Node.js 18+](https://nodejs.org/en)
+- [Git](https://git-scm.com/)
+- [Supabase account](https://supabase.com/)
+- [Clerk account](https://clerk.com/)
+
+### 1. Clone and Install
 ```bash
+git clone <your-template-repo-url>
+cd your-saas-project
 npm install
 ```
 
-**Set Up Environment Variables**
-
-Create a new file named `.env` in the root of your project and add the following content:
-
+### 2. Environment Setup
+Create `.env.local`:
 ```env
-# Clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
+# Clerk Authentication
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/
 NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/
 
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+# Supabase Database
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6...
+
+# Webhook (for user sync)
+CLERK_WEBHOOK_SECRET=whsec_...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6...
 ```
 
-Replace the placeholder values with your actual Supabase and Clerk credentials. You can obtain these by signing up on: [Supabase](https://supabase.com/dashboard), [Clerk](https://jsm.dev/converso-clerk).
+### 3. Database Setup
+```bash
+# Run the multi-tenant schema migration
+supabase db push
+# Or manually run: supabase/migrations/001_multi_tenant_schema.sql
+```
 
-**Running the Project**
+### 4. Clerk Configuration
+See `docs/setup-guide.md` for detailed Clerk + Supabase integration steps.
 
+### 5. Start Development
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser to view the project.
+Open [http://localhost:3000](http://localhost:3000) to see your multi-tenant SaaS foundation!
 
-## <a name="links">🔗 Assets</a>
+## 📚 Documentation
 
-You can find the example database schema in the root of this repository.
+- **[Setup Guide](docs/setup-guide.md)** - Step-by-step configuration instructions
+- **[Architecture Guide](docs/architecture.md)** - Detailed system architecture
+- **[Customization Guide](docs/customization-guide.md)** - How to adapt for your business domain
+- **[Testing Plan](docs/testing-plan-multi-tenant-saas.md)** - Comprehensive testing procedures
+- **[Integration Guide](docs/clerk-supabase-jwt-integration-2025.md)** - Clerk + Supabase setup
 
-## <a name="more">🚀 More</a>
+## 🔧 Customization
 
-**Advance your skills with Next.js Pro Course**
+### Adapt for Your Business Domain
 
-Enjoyed creating this project? Dive deeper into our PRO courses for a richer learning adventure. They're packed with
-detailed explanations, cool features, and exercises to boost your skills. Give it a go!
+This template includes a "recipe" example to demonstrate patterns. To customize for your business:
 
-<a href="https://jsm.dev/converso-nextjs" target="_blank">
-  <img src="public/readme/jsmpro.png" alt="Project Banner">
-</a>
+1. **Replace business entities**: Update `types/index.d.ts` with your data models
+2. **Update database schema**: Modify tables in `supabase/migrations/`
+3. **Update server actions**: Adapt `lib/actions/` for your business logic
+4. **Update UI components**: Customize pages in `app/` and components in `components/`
+5. **Update branding**: Change colors, logos, and content
+
+### Key Files to Customize
+```
+types/index.d.ts           # Your data models
+supabase/migrations/       # Your database schema
+lib/actions/              # Your business logic
+app/[your-domain]/        # Your app pages
+components/[your-domain]/ # Your app components
+```
+
+### Preservation Patterns ⚠️
+**Keep these patterns when customizing:**
+- Organization scoping in all database operations
+- User context validation in server actions
+- RLS policies for data isolation
+- JWT claims structure for authentication
+
+## 🧪 Testing
+
+Run the comprehensive test suite:
+```bash
+# Follow the testing plan
+docs/testing-plan-multi-tenant-saas.md
+
+# Key test areas:
+# - Multi-tenant isolation
+# - Role-based access control
+# - Authentication flows
+# - Security boundaries
+```
+
+## 🤝 Contributing
+
+This is a template repository. Feel free to:
+- Fork and adapt for your needs
+- Report issues or improvements
+- Share your success stories
+
+## 📄 License
+
+This template is open source and available under the [MIT License](LICENSE).
+
+---
+
+**Built with ❤️ for the SaaS community**
+
+Ready to build your next multi-tenant SaaS application? This foundation handles the complex authentication and multi-tenancy patterns, so you can focus on your unique business value.

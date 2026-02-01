@@ -1,10 +1,12 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code (claude.ai/code) when working with this multi-tenant SaaS template repository.
 
 ## Project Overview
 
-This is a full-stack SaaS template called "Recipe Emporium" - a recipe management and sharing platform that demonstrates modern SaaS architecture. It's built with Next.js App Router, Supabase for data, and Clerk for authentication/billing.
+This is a **production-ready multi-tenant SaaS template** that provides a complete foundation for building scalable SaaS applications. It demonstrates modern SaaS architecture with organization isolation, role-based access control, and enterprise-grade security patterns.
+
+**Template Nature**: This includes a "Recipe Emporium" example to demonstrate the multi-tenant patterns, but it's designed to be customized for any business domain.
 
 ## Development Commands
 
@@ -29,126 +31,256 @@ npm run lint
 - **TypeScript 5.x** with strict configuration
 - **Tailwind CSS 4.x** with PostCSS plugin for styling
 - **shadcn/ui** component library (Radix UI + Tailwind)
-- **Supabase** for PostgreSQL database and real-time features
+- **Supabase** for PostgreSQL database with RLS policies
 - **Clerk** for authentication, user management, and subscription billing
 - **Zod** for schema validation
 
-## Architecture
+## Multi-Tenant Architecture
+
+### Core Database Schema
+```
+organisations    # Organization entities
+├── users        # User profiles (synced from Clerk via webhooks)
+├── roles        # RBAC role definitions (platform_admin, org_admin, org_member)
+├── user_roles   # Role assignments
+└── [business]   # Your business entities (organization-scoped)
+```
+
+### Example Implementation (Recipes)
+- `recipes` - Business entity example (organization-scoped)
+- `comments` - Related data example (organization-scoped)
+- `recipes_unlocked` - Premium feature tracking (organization-scoped)
 
 ### App Structure (Next.js App Router)
 ```
 app/
-├── (auth)/sign-in/     # Auth layout group - sign-in page
-├── recipes/            # Recipe browsing and management
-│   ├── [id]/          # Individual recipe detail page
-│   └── new/           # Create new recipe page
-├── my-cookbook/       # User's personal recipe collection
+├── (auth)/sign-in/     # Authentication layout
+├── [business]/         # Your business domain pages (currently "recipes")
+│   ├── [id]/          # Individual entity detail page
+│   └── new/           # Create new entity page
+├── my-[domain]/       # User's personal collection
 ├── subscription/      # Pricing/subscription management
 ├── layout.tsx         # Root layout with ClerkProvider
 └── page.tsx          # Homepage
 ```
 
-### Data Layer
-- **Database**: PostgreSQL via Supabase with Row Level Security (RLS)
-- **Tables**: `recipes`, `comments`, `recipes_unlocked`
-- **Authentication**: Clerk native third-party auth integration with Supabase RLS policies
-- **Server Actions**: Located in `lib/actions/` for database operations
+## Key Patterns (Preserve These When Customizing)
 
-### Key Components
-- **UI Components**: `components/ui/` contains shadcn/ui components
-- **Business Components**: `components/` contains app-specific components
-- **Server Actions**: `lib/actions/` contains Next.js server actions for data operations
-- **Types**: `types/index.d.ts` defines Recipe and Comment interfaces
+### 1. Organization Scoping Pattern
+**All business data must include organization_id and be filtered by RLS policies.**
 
-## Database Schema
+```typescript
+// ✅ Correct pattern - always include organization context
+export const getBusinessEntities = async () => {
+  const user = await getCurrentUser();
+  if (!user?.organisationId) return [];
 
-Three main tables with RLS policies:
+  // RLS policies automatically filter by org_id from JWT claims
+  const { data } = await supabase
+    .from("your_business_table")
+    .select("*");
+};
 
-1. **recipes**: Recipe data with ingredients array, owned by users
-2. **comments**: User comments on recipes with foreign key to recipes
-3. **recipes_unlocked**: Tracks which users have paid to unlock premium recipes
+// ✅ Creating entities with organization scope
+export const createBusinessEntity = async (entity: BusinessEntity) => {
+  const { user, organisationId } = await requireUserWithOrg();
 
-RLS Policies ensure users can only modify their own data while viewing is controlled by subscription status.
+  const { data } = await supabase
+    .from("your_business_table")
+    .insert({
+      ...entity,
+      user_id: user.clerkId,
+      organisation_id: organisationId  // Always include org scope
+    });
+};
+```
 
-## Authentication Flow
+### 2. User Context Validation Pattern
+**Always validate user authentication and organization context in server actions.**
 
-1. **Middleware**: `clerkMiddleware()` protects all routes except static files
-2. **User Context**: Use `auth()` from `@clerk/nextjs/server` in Server Components
-3. **Supabase Integration**: Clerk session tokens authenticate Supabase requests via native third-party auth
-4. **Protected Actions**: Server actions check user authentication before database operations
+```typescript
+import { getCurrentUser, requireUserWithOrg, requirePlatformAdmin } from "@/lib/auth/user";
 
-## ⚠️ CRITICAL: Clerk + Supabase Integration
+// For organization-scoped operations
+export const businessOperation = async () => {
+  const { user, organisationId } = await requireUserWithOrg();
+  // Proceed with organization context
+};
 
-**ALWAYS REFER TO**:
-- [`docs/clerk-supabase-jwt-integration-2025.md`](docs/clerk-supabase-jwt-integration-2025.md) - **Canonical JWT integration guide (2025)**
-- [`docs/clerk-supabase-integration.md`](docs/clerk-supabase-integration.md) - Implementation details
+// For platform admin operations
+export const adminOperation = async () => {
+  const user = await requirePlatformAdmin();
+  // Platform admin can access cross-organization data
+};
+```
 
-**🚨 CRITICAL**: This project uses **Third-Party Auth with OIDC** (NOT JWT signing keys or shared secrets). The integration uses Clerk as the identity provider with Supabase verifying Clerk JWTs via public keys.
+### 3. RLS Policy Pattern
+**Use JWT claims for performance-optimized Row Level Security.**
 
-**❌ WRONG APPROACHES (Deprecated)**:
-- Creating Supabase JWT signing keys for Clerk
-- Sharing JWT secrets between Clerk and Supabase
-- Using JWT templates with shared secrets
+```sql
+-- Organization isolation for standard users
+CREATE POLICY "users_see_own_org_data" ON your_table
+FOR SELECT TO authenticated
+USING (organisation_id = (auth.jwt() ->> 'org_id')::uuid);
 
-**✅ CORRECT APPROACH (2025)**:
-- Clerk issues JWTs with custom claims
-- Supabase trusts Clerk as Third-Party Auth provider
-- Verification via OIDC discovery (no shared secrets)
+-- Platform admin override
+CREATE POLICY "platform_admins_see_all_data" ON your_table
+FOR SELECT TO authenticated
+USING ((auth.jwt() ->> 'user_role') = 'platform_admin');
+```
 
-**Common Issues Solved in the Guides**:
-- RLS policy violations ("new row violates row-level security policy")
-- Authentication not working with Supabase
-- JWT verification configuration
-- Proper Third-Party Auth setup
+### 4. Authentication Integration
+**Third-Party Auth with Clerk + Supabase (NOT JWT signing keys)**
+
+```typescript
+// lib/supabase.ts - Correct integration pattern
+export const createSupabaseClient = async () => {
+  const { getToken } = await auth();
+
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      accessToken: async () => {
+        return await getToken(); // Clerk handles JWT with custom claims
+      },
+    }
+  );
+};
+```
+
+## Critical Authentication Configuration
+
+### Clerk Session Token Claims
+**MUST be configured in Clerk Dashboard → Sessions → Customize:**
+```json
+{
+  "role": "authenticated",
+  "user_role": "{{user.public_metadata.role || 'org_member'}}",
+  "org_id": "{{user.public_metadata.organisation_id}}"
+}
+```
+
+### Supabase Third-Party Auth
+**MUST use Third-Party Auth providers, NOT JWT signing keys:**
+- Supabase trusts Clerk via OIDC discovery
+- No shared secrets required
+- Asymmetric JWT verification
 
 ## Environment Variables Required
 
 ```env
 # Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
-CLERK_SECRET_KEY=
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
 NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
 NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/
 NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/
 
 # Supabase Database
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6...
+
+# Webhooks (for user lifecycle sync)
+CLERK_WEBHOOK_SECRET=whsec_...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6...
 ```
 
-## Key Patterns
+## Customization Guide
 
-### Server Actions Pattern
-Server actions in `lib/actions/` handle all database operations:
-- `getRecipes()` - Fetch recipes with unlock status
-- `getUserRecipes()` - Get user's own recipes
-- `createRecipe()` - Create new recipe with validation
-- `unlockRecipe()` - Handle recipe purchases
+### Adapting for Your Business Domain
 
-### Form Validation
-Forms use React Hook Form + Zod:
-```typescript
-const form = useForm<z.infer<typeof recipeSchema>>({
-  resolver: zodResolver(recipeSchema),
-})
-```
+1. **Update Types** (`types/index.d.ts`):
+   ```typescript
+   // Replace Recipe/Comment with your entities
+   export interface YourBusinessEntity {
+     id: string;
+     name: string;
+     // your fields...
+     user_id: string;           // Keep: user context
+     organisation_id: string;   // Keep: organization scope
+     created_at: string;        // Keep: timestamps
+   }
+   ```
 
-### Component Structure
-- Server Components for data fetching
-- Client Components for interactivity (marked with "use client")
-- shadcn/ui components for consistent design system
+2. **Update Database Schema** (`supabase/migrations/`):
+   ```sql
+   -- Replace recipes table with your business table
+   CREATE TABLE your_business_table (
+     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+     name VARCHAR NOT NULL,
+     -- your fields...
+     user_id UUID REFERENCES users(id) NOT NULL,
+     organisation_id UUID REFERENCES organisations(id) NOT NULL,
+     created_at TIMESTAMPTZ DEFAULT NOW(),
+     updated_at TIMESTAMPTZ DEFAULT NOW()
+   );
 
-## Subscription Model
+   -- Apply RLS policies (copy pattern from recipes)
+   ALTER TABLE your_business_table ENABLE ROW LEVEL SECURITY;
+   ```
 
-- **Free Tier**: Limited recipe access
-- **Paid Tier**: Unlimited recipe unlocks via Clerk's PricingTable
-- **Unlock Tracking**: `recipes_unlocked` table stores individual purchases
-- **Access Control**: Server actions check unlock status before revealing premium content
+3. **Update Server Actions** (`lib/actions/`):
+   - Copy the patterns from `recipe.actions.ts`
+   - Replace business logic while preserving auth patterns
+   - Keep organization scoping and user context validation
+
+4. **Update UI Components**:
+   - Replace pages in `app/recipes/` with `app/your-domain/`
+   - Update components to match your business entities
+   - Preserve authentication and organization context
 
 ## Important Files
 
-- `middleware.ts`: Clerk authentication middleware configuration
+- `lib/auth/user.ts`: User context and role management utilities
 - `lib/supabase.ts`: Supabase client with Clerk token integration
-- `supabase_schema.sql`: Complete database schema with RLS policies
-- `components.json`: shadcn/ui configuration for consistent theming
-- `app/layout.tsx`: Root layout with ClerkProvider and global styles
+- `supabase/migrations/001_multi_tenant_schema.sql`: Complete database schema
+- `app/api/webhooks/clerk/route.ts`: User lifecycle sync via webhooks
+- `middleware.ts`: Route protection and authentication middleware
+
+## Documentation
+
+- `docs/setup-guide.md`: Complete setup instructions for new projects
+- `docs/clerk-supabase-jwt-integration-2025.md`: Authentication integration guide
+- `docs/testing-plan-multi-tenant-saas.md`: Comprehensive testing procedures
+- `docs/customization-guide.md`: Step-by-step customization instructions
+
+## ⚠️ Critical Guidelines
+
+### What to Preserve When Customizing
+- **Organization scoping** in all database operations
+- **User context validation** in all server actions
+- **RLS policies** for data isolation
+- **JWT claims structure** for authentication
+- **Webhook user sync** for user lifecycle management
+
+### What to Replace/Customize
+- Business entity types and schemas
+- UI components and pages
+- Business logic in server actions
+- Branding and visual design
+- Feature-specific functionality
+
+### Common Mistakes to Avoid
+- ❌ Removing organization_id from database operations
+- ❌ Bypassing user context validation in server actions
+- ❌ Using shared JWT secrets (deprecated approach)
+- ❌ Hardcoding organization IDs
+- ❌ Modifying authentication patterns without testing
+
+## Testing
+
+This template includes comprehensive testing documentation:
+- Authentication flow testing
+- Multi-tenant isolation verification
+- Role-based access control validation
+- Security boundary testing
+- Performance validation
+
+See `docs/testing-plan-multi-tenant-saas.md` for full testing procedures.
+
+## Template Philosophy
+
+This template demonstrates proven patterns for multi-tenant SaaS applications through a working example. The recipe domain is intentionally simple to focus attention on the **architecture patterns** rather than complex business logic.
+
+When customizing, preserve the security and multi-tenancy patterns while adapting the business domain to your needs.

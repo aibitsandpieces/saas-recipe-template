@@ -1,6 +1,7 @@
 {
-  "name": "saas-mini-course",
-  "version": "0.1.0",
+  "name": "multi-tenant-saas-template",
+  "version": "1.0.0",
+  "description": "Production-ready multi-tenant SaaS foundation with 3-role RBAC, organization isolation, and Clerk + Supabase integration",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
