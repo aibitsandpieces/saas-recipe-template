@@ -79,15 +79,27 @@ RLS Policies ensure users can only modify their own data while viewing is contro
 
 ## ⚠️ CRITICAL: Clerk + Supabase Integration
 
-**ALWAYS REFER TO**: [`docs/clerk-supabase-integration.md`](docs/clerk-supabase-integration.md)
+**ALWAYS REFER TO**:
+- [`docs/clerk-supabase-jwt-integration-2025.md`](docs/clerk-supabase-jwt-integration-2025.md) - **Canonical JWT integration guide (2025)**
+- [`docs/clerk-supabase-integration.md`](docs/clerk-supabase-integration.md) - Implementation details
 
-This project uses the **native third-party auth integration** between Clerk and Supabase (NOT deprecated JWT templates). If you encounter authentication issues, RLS policy violations, or need to modify the Supabase client configuration, consult the comprehensive integration guide first.
+**🚨 CRITICAL**: This project uses **Third-Party Auth with OIDC** (NOT JWT signing keys or shared secrets). The integration uses Clerk as the identity provider with Supabase verifying Clerk JWTs via public keys.
 
-**Common Issues Solved in the Guide**:
+**❌ WRONG APPROACHES (Deprecated)**:
+- Creating Supabase JWT signing keys for Clerk
+- Sharing JWT secrets between Clerk and Supabase
+- Using JWT templates with shared secrets
+
+**✅ CORRECT APPROACH (2025)**:
+- Clerk issues JWTs with custom claims
+- Supabase trusts Clerk as Third-Party Auth provider
+- Verification via OIDC discovery (no shared secrets)
+
+**Common Issues Solved in the Guides**:
 - RLS policy violations ("new row violates row-level security policy")
 - Authentication not working with Supabase
-- Migration from legacy JWT template approach
-- Proper Supabase client configuration
+- JWT verification configuration
+- Proper Third-Party Auth setup
 
 ## Environment Variables Required
 
