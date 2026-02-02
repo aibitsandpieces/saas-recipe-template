@@ -1,219 +1,177 @@
-# Multi-Tenant SaaS Template
+# Supabase CLI
 
-<div align="center">
-  <h3 align="center">Production-Ready Multi-Tenant SaaS Foundation</h3>
+[![Coverage Status](https://coveralls.io/repos/github/supabase/cli/badge.svg?branch=main)](https://coveralls.io/github/supabase/cli?branch=main) [![Bitbucket Pipelines](https://img.shields.io/bitbucket/pipelines/supabase-cli/setup-cli/master?style=flat-square&label=Bitbucket%20Canary)](https://bitbucket.org/supabase-cli/setup-cli/pipelines) [![Gitlab Pipeline Status](https://img.shields.io/gitlab/pipeline-status/sweatybridge%2Fsetup-cli?label=Gitlab%20Canary)
+](https://gitlab.com/sweatybridge/setup-cli/-/pipelines)
 
-  <div>
-    <img src="https://img.shields.io/badge/-Next.JS-black?style=for-the-badge&logoColor=white&logo=nextdotjs&color=black" alt="next.js" />
-    <img src="https://img.shields.io/badge/-TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="typescript" />
-    <img src="https://img.shields.io/badge/-Tailwind-00BCFF?style=for-the-badge&logo=tailwind-css&logoColor=white" />
-    <img src="https://img.shields.io/badge/-Clerk-6C47FF?style=for-the-badge&logoColor=white&logo=clerk" alt="clerk" />
-    <img src="https://img.shields.io/badge/-Supabase-3FCF8E?style=for-the-badge&logo=supabase&logoColor=white" />
-  </div>
+[Supabase](https://supabase.io) is an open source Firebase alternative. We're building the features of Firebase using enterprise-grade open source tools.
 
-  <p align="center">
-    A complete, tested, production-ready foundation for building multi-tenant SaaS applications with organization isolation, role-based access control, and modern authentication.
-  </p>
-</div>
+This repository contains all the functionality for Supabase CLI.
 
-## 📋 Table of Contents
+- [x] Running Supabase locally
+- [x] Managing database migrations
+- [x] Creating and deploying Supabase Functions
+- [x] Generating types directly from your database schema
+- [x] Making authenticated HTTP requests to [Management API](https://supabase.com/docs/reference/api/introduction)
 
-1. 🤖 [Introduction](#introduction)
-2. ⚙️ [Tech Stack](#tech-stack)
-3. 🔋 [Features](#features)
-4. 🏗️ [Architecture](#architecture)
-5. 🚀 [Quick Start](#quick-start)
-6. 📚 [Documentation](#documentation)
-7. 🔧 [Customization](#customization)
+## Getting started
 
-## 🤖 Introduction
+### Install the CLI
 
-This is a **battle-tested multi-tenant SaaS foundation** that provides everything you need to build scalable SaaS applications with proper organization isolation, role-based permissions, and enterprise-grade security.
+Available via [NPM](https://www.npmjs.com) as dev dependency. To install:
 
-**What makes this special:**
-- ✅ **Fully implemented multi-tenant architecture** with organization data isolation
-- ✅ **3-role RBAC system** (platform_admin, org_admin, org_member)
-- ✅ **Production-tested** authentication and authorization flows
-- ✅ **Row Level Security (RLS)** policies for data protection
-- ✅ **Comprehensive testing plan** and documentation
-- ✅ **Ready to customize** for any business domain
-
-## ⚙️ Tech Stack
-
-- **[Next.js 16.1.6](https://nextjs.org/)** - React framework with App Router and Server Components
-- **[TypeScript 5.x](https://www.typescriptlang.org/)** - Type safety and better developer experience
-- **[Clerk](https://clerk.com/)** - Authentication, user management, and subscription billing
-- **[Supabase](https://supabase.com/)** - PostgreSQL database with real-time features and RLS
-- **[shadcn/ui](https://ui.shadcn.com/)** - Modern component library built on Radix UI
-- **[Tailwind CSS 4.x](https://tailwindcss.com/)** - Utility-first CSS framework
-- **[Zod](https://zod.dev/)** - TypeScript-first schema validation
-
-## 🔋 Features
-
-### 🏢 Multi-Tenant Architecture
-- **Organization isolation** - Complete data separation between organizations
-- **Cross-organization access control** - Platform admins can access all data
-- **Scalable database design** - Optimized for performance at scale
-
-### 👥 Role-Based Access Control (RBAC)
-- **Platform Admin** - Global access across all organizations
-- **Organization Admin** - Administrative access within their organization
-- **Organization Member** - Standard user access within their organization
-
-### 🔐 Enterprise-Grade Security
-- **JWT-based authentication** with custom claims
-- **Row Level Security (RLS)** policies in PostgreSQL
-- **Third-party auth integration** (Clerk + Supabase OIDC)
-- **Comprehensive security testing** - Tested for common vulnerabilities
-
-### 🚀 Developer Experience
-- **Type-safe database operations** with TypeScript
-- **Server Actions** for secure backend operations
-- **Modern React patterns** with hooks and components
-- **Comprehensive documentation** and setup guides
-
-### 📱 Production Ready
-- **Responsive design** works on all devices
-- **Performance optimized** with Next.js 16.1.6 and Turbopack
-- **Error handling** and user feedback systems
-- **Testing framework** with validation procedures
-
-## 🏗️ Architecture
-
-### Multi-Tenant Database Design
-```sql
-organisations    # Organization entities
-├── users        # User profiles (synced via webhooks)
-├── roles        # RBAC role definitions
-├── user_roles   # Role assignments
-└── [your_data] # Your business entities (auto-scoped to organization)
-```
-
-### Authentication Flow
-```
-User Sign-in → Clerk JWT → Custom Claims → Supabase RLS → Organization-Scoped Data
-```
-
-### Security Model
-- **JWT tokens** contain `org_id` and `user_role` claims
-- **RLS policies** automatically filter data by organization
-- **Server actions** validate user context before operations
-- **Middleware protection** on all routes
-
-## 🚀 Quick Start
-
-### Prerequisites
-- [Node.js 18+](https://nodejs.org/en)
-- [Git](https://git-scm.com/)
-- [Supabase account](https://supabase.com/)
-- [Clerk account](https://clerk.com/)
-
-### 1. Clone and Install
 ```bash
-git clone <your-template-repo-url>
-cd your-saas-project
-npm install
+npm i supabase --save-dev
 ```
 
-### 2. Environment Setup
-Create `.env.local`:
-```env
-# Clerk Authentication
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL=/
-NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL=/
+When installing with yarn 4, you need to disable experimental fetch with the following nodejs config.
 
-# Supabase Database
-NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6...
-
-# Webhook (for user sync)
-CLERK_WEBHOOK_SECRET=whsec_...
-SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6...
+```
+NODE_OPTIONS=--no-experimental-fetch yarn add supabase
 ```
 
-### 3. Database Setup
+> **Note**
+For Bun versions below v1.0.17, you must add `supabase` as a [trusted dependency](https://bun.sh/guides/install/trusted) before running `bun add -D supabase`.
+
+<details>
+  <summary><b>macOS</b></summary>
+
+  Available via [Homebrew](https://brew.sh). To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To install the beta release channel:
+  
+  ```sh
+  brew install supabase/tap/supabase-beta
+  brew link --overwrite supabase-beta
+  ```
+  
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+</details>
+
+<details>
+  <summary><b>Windows</b></summary>
+
+  Available via [Scoop](https://scoop.sh). To install:
+
+  ```powershell
+  scoop bucket add supabase https://github.com/supabase/scoop-bucket.git
+  scoop install supabase
+  ```
+
+  To upgrade:
+
+  ```powershell
+  scoop update supabase
+  ```
+</details>
+
+<details>
+  <summary><b>Linux</b></summary>
+
+  Available via [Homebrew](https://brew.sh) and Linux packages.
+
+  #### via Homebrew
+
+  To install:
+
+  ```sh
+  brew install supabase/tap/supabase
+  ```
+
+  To upgrade:
+
+  ```sh
+  brew upgrade supabase
+  ```
+
+  #### via Linux packages
+
+  Linux packages are provided in [Releases](https://github.com/supabase/cli/releases). To install, download the `.apk`/`.deb`/`.rpm`/`.pkg.tar.zst` file depending on your package manager and run the respective commands.
+
+  ```sh
+  sudo apk add --allow-untrusted <...>.apk
+  ```
+
+  ```sh
+  sudo dpkg -i <...>.deb
+  ```
+
+  ```sh
+  sudo rpm -i <...>.rpm
+  ```
+
+  ```sh
+  sudo pacman -U <...>.pkg.tar.zst
+  ```
+</details>
+
+<details>
+  <summary><b>Other Platforms</b></summary>
+
+  You can also install the CLI via [go modules](https://go.dev/ref/mod#go-install) without the help of package managers.
+
+  ```sh
+  go install github.com/supabase/cli@latest
+  ```
+
+  Add a symlink to the binary in `$PATH` for easier access:
+
+  ```sh
+  ln -s "$(go env GOPATH)/bin/cli" /usr/bin/supabase
+  ```
+
+  This works on other non-standard Linux distros.
+</details>
+
+<details>
+  <summary><b>Community Maintained Packages</b></summary>
+
+  Available via [pkgx](https://pkgx.sh/). Package script [here](https://github.com/pkgxdev/pantry/blob/main/projects/supabase.com/cli/package.yml).
+  To install in your working directory:
+
+  ```bash
+  pkgx install supabase
+  ```
+
+  Available via [Nixpkgs](https://nixos.org/). Package script [here](https://github.com/NixOS/nixpkgs/blob/master/pkgs/development/tools/supabase-cli/default.nix).
+</details>
+
+### Run the CLI
+
 ```bash
-# Run the multi-tenant schema migration
-supabase db push
-# Or manually run: supabase/migrations/001_multi_tenant_schema.sql
+supabase bootstrap
 ```
 
-### 4. Clerk Configuration
-See `docs/setup-guide.md` for detailed Clerk + Supabase integration steps.
+Or using npx:
 
-### 5. Start Development
 ```bash
-npm run dev
+npx supabase bootstrap
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to see your multi-tenant SaaS foundation!
+The bootstrap command will guide you through the process of setting up a Supabase project using one of the [starter](https://github.com/supabase-community/supabase-samples/blob/main/samples.json) templates.
 
-## 📚 Documentation
+## Docs
 
-- **[Setup Guide](docs/setup-guide.md)** - Step-by-step configuration instructions
-- **[Architecture Guide](docs/architecture.md)** - Detailed system architecture
-- **[Customization Guide](docs/customization-guide.md)** - How to adapt for your business domain
-- **[Testing Plan](docs/testing-plan-multi-tenant-saas.md)** - Comprehensive testing procedures
-- **[Integration Guide](docs/clerk-supabase-jwt-integration-2025.md)** - Clerk + Supabase setup
+Command & config reference can be found [here](https://supabase.com/docs/reference/cli/about).
 
-## 🔧 Customization
+## Breaking changes
 
-### Adapt for Your Business Domain
+We follow semantic versioning for changes that directly impact CLI commands, flags, and configurations.
 
-This template includes a "recipe" example to demonstrate patterns. To customize for your business:
+However, due to dependencies on other service images, we cannot guarantee that schema migrations, seed.sql, and generated types will always work for the same CLI major version. If you need such guarantees, we encourage you to pin a specific version of CLI in package.json.
 
-1. **Replace business entities**: Update `types/index.d.ts` with your data models
-2. **Update database schema**: Modify tables in `supabase/migrations/`
-3. **Update server actions**: Adapt `lib/actions/` for your business logic
-4. **Update UI components**: Customize pages in `app/` and components in `components/`
-5. **Update branding**: Change colors, logos, and content
+## Developing
 
-### Key Files to Customize
+To run from source:
+
+```sh
+# Go >= 1.22
+go run . help
 ```
-types/index.d.ts           # Your data models
-supabase/migrations/       # Your database schema
-lib/actions/              # Your business logic
-app/[your-domain]/        # Your app pages
-components/[your-domain]/ # Your app components
-```
-
-### Preservation Patterns ⚠️
-**Keep these patterns when customizing:**
-- Organization scoping in all database operations
-- User context validation in server actions
-- RLS policies for data isolation
-- JWT claims structure for authentication
-
-## 🧪 Testing
-
-Run the comprehensive test suite:
-```bash
-# Follow the testing plan
-docs/testing-plan-multi-tenant-saas.md
-
-# Key test areas:
-# - Multi-tenant isolation
-# - Role-based access control
-# - Authentication flows
-# - Security boundaries
-```
-
-## 🤝 Contributing
-
-This is a template repository. Feel free to:
-- Fork and adapt for your needs
-- Report issues or improvements
-- Share your success stories
-
-## 📄 License
-
-This template is open source and available under the [MIT License](LICENSE).
-
----
-
-**Built with ❤️ for the SaaS community**
-
-Ready to build your next multi-tenant SaaS application? This foundation handles the complex authentication and multi-tenancy patterns, so you can focus on your unique business value.
