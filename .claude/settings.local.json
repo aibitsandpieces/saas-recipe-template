@@ -78,7 +78,9 @@
       "Bash(npx next lint:*)",
       "Bash(npx eslint:*)",
       "Bash(powershell \"Stop-Process -Id 25864 -Force\")",
-      "WebFetch(domain:localhost)"
+      "WebFetch(domain:localhost)",
+      "Bash(TASKKILL /F /PID 33008)",
+      "Bash(cmd //c \"TASKKILL /F /PID 33008\")"
     ]
   }
 }

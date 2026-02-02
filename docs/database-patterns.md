@@ -526,6 +526,146 @@ export async function getRecipes() {
 }
 ```
 
+### Advanced Bulk Operations & RLS Error Handling
+```typescript
+// ✅ Good - Comprehensive error handling for bulk operations
+export async function deleteAllWorkflows(): Promise<{ deletedCount: number }> {
+  // 1. Permission verification function
+  const verifyBulkDeletionPermissions = async () => {
+    const user = await requirePlatformAdmin()
+    const supabase = await createSupabaseClient()
+
+    // Test RLS access to related tables
+    const { error: testError } = await supabase
+      .from("workflow_files")
+      .select("id")
+      .limit(1)
+
+    if (testError) {
+      console.error("RLS policy test failed for workflow_files:", testError)
+      throw new Error(`Platform admin cannot access workflow_files table. RLS policy may be misconfigured: ${testError.message}`)
+    }
+  }
+
+  // 2. Verify permissions first
+  await verifyBulkDeletionPermissions()
+  const supabase = await createSupabaseClient()
+
+  // 3. Get count for audit trail
+  const { data: workflows, error: countError } = await supabase
+    .from("workflows")
+    .select("id")
+
+  if (countError) {
+    throw new Error(`Failed to count workflows: ${countError.message}`)
+  }
+
+  console.log(`Platform admin initiating bulk deletion of ${workflows?.length || 0} workflows`)
+
+  try {
+    // 4. Main deletion with enhanced error classification
+    const { error } = await supabase
+      .from("workflows")
+      .delete()
+      .neq("id", "")
+
+    if (error) {
+      console.error("Detailed deletion error:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+
+      // 5. Specific error handling by type
+      if (error.code === '42501' || error.message.includes('policy')) {
+        throw new Error(`Database policy violation during bulk delete. This may indicate RLS policy issues with cascading operations. Original error: ${error.message}`)
+      }
+
+      if (error.code === '23503' || error.message.includes('foreign key')) {
+        throw new Error(`Foreign key constraint violation during bulk delete. Some workflow files may be blocking deletion. Original error: ${error.message}`)
+      }
+
+      throw new Error(`Failed to delete all workflows: ${error.message}`)
+    }
+
+    return { deletedCount: workflows?.length || 0 }
+  } catch (dbError) {
+    console.error("Database operation failed:", dbError)
+    throw dbError
+  }
+}
+
+// ✅ Alternative implementation for RLS cascading issues
+export async function deleteAllWorkflowsExplicit(): Promise<{ deletedCount: number }> {
+  await requirePlatformAdmin()
+  const supabase = await createSupabaseClient()
+
+  const { data: workflows, error: countError } = await supabase
+    .from("workflows")
+    .select("id")
+
+  if (countError) {
+    throw new Error(`Failed to count workflows: ${countError.message}`)
+  }
+
+  try {
+    // Explicit deletion sequence to avoid RLS cascading issues
+    // Step 1: Delete all workflow files explicitly
+    const { error: filesError } = await supabase
+      .from("workflow_files")
+      .delete()
+      .neq("id", "")
+
+    if (filesError) {
+      throw new Error(`Failed to delete workflow files: ${filesError.message}`)
+    }
+
+    // Step 2: Delete all workflows
+    const { error: workflowsError } = await supabase
+      .from("workflows")
+      .delete()
+      .neq("id", "")
+
+    if (workflowsError) {
+      throw new Error(`Failed to delete workflows: ${workflowsError.message}`)
+    }
+
+    return { deletedCount: workflows?.length || 0 }
+  } catch (error) {
+    console.error("Manual deletion sequence failed:", error)
+    throw error
+  }
+}
+```
+
+### Client-Side Error Display
+```typescript
+// ✅ Good - Enhanced client error handling based on backend error types
+const handleDeleteAllWorkflows = async () => {
+  try {
+    const result = await deleteAllWorkflows()
+    toast.success(`Successfully deleted ${result.deletedCount} workflows`)
+  } catch (error) {
+    let errorMessage = "Failed to delete workflows"
+
+    if (error instanceof Error) {
+      if (error.message.includes('policy violation')) {
+        errorMessage = "Database permission error. Check administrator privileges."
+      } else if (error.message.includes('foreign key constraint')) {
+        errorMessage = "Database constraint error. Some files may be blocking deletion."
+      } else if (error.message.includes('cannot access')) {
+        errorMessage = "Database access error. Administrator permissions misconfigured."
+      } else if (error.message.length < 100) {
+        errorMessage = error.message // Show specific short error messages
+      }
+    }
+
+    toast.error(errorMessage)
+  }
+}
+```
+
 ## Real-time Subscriptions
 
 ### Setting Up Realtime

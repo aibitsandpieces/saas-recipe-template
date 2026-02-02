@@ -49,10 +49,10 @@ export default function WorkflowImportPage() {
       return
     }
 
-    // Validate file size (8MB limit)
-    const maxSize = 8 * 1024 * 1024
+    // Validate file size (20MB limit)
+    const maxSize = 20 * 1024 * 1024
     if (selectedFile.size > maxSize) {
-      setError('File size must be less than 8MB')
+      setError('File size must be less than 20MB')
       return
     }
 

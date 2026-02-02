@@ -1,5 +1,7 @@
 import { getWorkflowCategoriesWithDepartments, searchWorkflows } from "@/lib/actions/workflow.actions"
 import { getImportLogs } from "@/lib/actions/csv-import.actions"
+import { WorkflowActionsDropdown } from "@/components/admin/WorkflowActionsDropdown"
+import { WorkflowBulkActions } from "@/components/admin/WorkflowBulkActions"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,7 +30,7 @@ export default async function WorkflowsAdminPage() {
   // Fetch all data needed for the dashboard
   const [categoriesWithDepartments, allWorkflows, recentImportLogs] = await Promise.all([
     getWorkflowCategoriesWithDepartments(),
-    searchWorkflows({}),
+    searchWorkflows({ limit: 20, page: 1 }), // Show first 20 workflows for overview
     getImportLogs()
   ])
 
@@ -47,6 +49,9 @@ export default async function WorkflowsAdminPage() {
           </p>
         </div>
         <div className="flex space-x-2">
+          <WorkflowBulkActions
+            totalWorkflows={totalWorkflows}
+          />
           <Button asChild variant="outline">
             <Link href="/admin/workflows/import">
               <Upload className="mr-2 h-4 w-4" />
@@ -258,21 +263,22 @@ export default async function WorkflowsAdminPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href={`/admin/workflows/${workflow.id}/edit`}>
-                            Edit
-                          </Link>
-                        </Button>
+                        <WorkflowActionsDropdown
+                          workflowId={workflow.id!}
+                          workflowName={workflow.name}
+                        />
                       </TableCell>
                     </TableRow>
                   ))
                 )}
               </TableBody>
             </Table>
-            {allWorkflows.workflows.length > 20 && (
+            {allWorkflows.pagination.hasNextPage && (
               <div className="p-4 text-center">
                 <Button asChild variant="outline">
-                  <Link href="/admin/workflows/all">View All Workflows</Link>
+                  <Link href="/admin/workflows/all">
+                    View All Workflows ({allWorkflows.totalCount} total)
+                  </Link>
                 </Button>
               </div>
             )}
