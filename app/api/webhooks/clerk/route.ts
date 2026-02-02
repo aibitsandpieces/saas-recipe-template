@@ -76,72 +76,177 @@ export async function POST(req: NextRequest) {
 
 /**
  * Handle user creation in Clerk
- * Creates corresponding user record in Supabase and assigns default role
+ * Creates corresponding user record in Supabase, checks for pending invitations,
+ * and assigns appropriate role and individual course enrollments
  */
 async function handleUserCreated(clerkUser: any, supabase: any) {
   console.log("Creating user:", clerkUser.id);
 
-  const orgId = clerkUser.public_metadata?.organisation_id;
-  const email = clerkUser.email_addresses[0]?.email_address;
+  const email = clerkUser.email_addresses[0]?.email_address?.toLowerCase();
   const name = `${clerkUser.first_name || ""} ${clerkUser.last_name || ""}`.trim() || null;
 
+  if (!email) {
+    throw new Error("No email address found for user");
+  }
+
   try {
-    // Create user record in Supabase
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .insert({
-        clerk_id: clerkUser.id,
-        email: email,
-        name: name,
-        organisation_id: orgId || null
-      })
-      .select("id")
+    // Check for pending invitation
+    const { data: invitation, error: invitationError } = await supabase
+      .from("user_invitations")
+      .select("*")
+      .eq("email", email)
+      .eq("status", "pending")
       .single();
 
-    if (userError) {
-      console.error("Error creating user:", userError);
-      throw userError;
+    if (invitationError && invitationError.code !== 'PGRST116') {
+      console.error("Error checking for invitation:", invitationError);
+      throw invitationError;
     }
 
-    // Assign default org_member role if they have an organisation
-    if (orgId && user) {
-      const { data: role, error: roleError } = await supabase
-        .from("roles")
+    let orgId = clerkUser.public_metadata?.organisation_id;
+    let userRole = "org_member";
+
+    // If invitation exists, use invitation details
+    if (invitation) {
+      orgId = invitation.organisation_id;
+      userRole = invitation.role_name;
+      console.log(`Found pending invitation for ${email}, org: ${orgId}, role: ${userRole}`);
+    }
+
+    // Execute user creation with transaction boundaries
+    let user: any;
+    try {
+      // Use Supabase RPC for atomic transaction
+      const { data, error } = await supabase.rpc('create_user_with_role_and_enrollments', {
+        p_clerk_id: clerkUser.id,
+        p_email: email,
+        p_name: name,
+        p_organisation_id: orgId,
+        p_role_name: userRole,
+        p_invitation_id: invitation?.id || null,
+        p_course_ids: invitation?.courses || []
+      });
+
+      if (error) {
+        console.error("Error in user creation transaction:", error);
+        throw error;
+      }
+
+      user = data;
+      console.log("User created successfully with transaction:", user);
+    } catch (transactionError) {
+      // If RPC doesn't exist yet, fall back to individual operations with error handling
+      console.warn("RPC not available, using fallback approach:", transactionError);
+
+      // Create user record in Supabase
+      const { data: createdUser, error: userError } = await supabase
+        .from("users")
+        .insert({
+          clerk_id: clerkUser.id,
+          email: email,
+          name: name,
+          organisation_id: orgId || null
+        })
         .select("id")
-        .eq("name", "org_member")
         .single();
 
-      if (roleError) {
-        console.error("Error finding org_member role:", roleError);
-        throw roleError;
+      if (userError) {
+        console.error("Error creating user:", userError);
+        throw userError;
       }
 
-      if (role) {
-        const { error: userRoleError } = await supabase
-          .from("user_roles")
-          .insert({
-            user_id: user.id,
-            role_id: role.id,
-            organisation_id: orgId
-          });
+      user = createdUser;
 
-        if (userRoleError) {
-          console.error("Error assigning role:", userRoleError);
-          throw userRoleError;
-        }
+      // Assign role if they have an organisation
+      if (orgId && user) {
+        try {
+          const { data: role, error: roleError } = await supabase
+            .from("roles")
+            .select("id")
+            .eq("name", userRole)
+            .single();
 
-        // Update Clerk metadata with role information
-        const clerk = await clerkClient();
-        await clerk.users.updateUser(clerkUser.id, {
-          publicMetadata: {
-            organisation_id: orgId,
-            role: "org_member"
+          if (roleError) {
+            console.error(`Error finding ${userRole} role:`, roleError);
+            throw roleError;
           }
-        });
+
+          if (role) {
+            const { error: userRoleError } = await supabase
+              .from("user_roles")
+              .insert({
+                user_id: user.id,
+                role_id: role.id,
+                organisation_id: orgId
+              });
+
+            if (userRoleError) {
+              console.error("Error assigning role:", userRoleError);
+              throw userRoleError;
+            }
+
+            // Process individual course enrollments from invitation
+            if (invitation && invitation.courses && invitation.courses.length > 0) {
+              const enrollments = invitation.courses.map((courseId: string) => ({
+                user_id: user.id,
+                course_id: courseId,
+                enrolled_by: invitation.invited_by
+              }));
+
+              const { error: enrollmentError } = await supabase
+                .from("course_user_enrollments")
+                .insert(enrollments);
+
+              if (enrollmentError) {
+                console.error("Error creating course enrollments:", enrollmentError);
+                // Don't throw here for non-critical enrollment failures
+              } else {
+                console.log(`Created ${enrollments.length} course enrollments for user`);
+              }
+            }
+
+            // Update invitation status to accepted
+            if (invitation) {
+              const { error: updateInvitationError } = await supabase
+                .from("user_invitations")
+                .update({
+                  status: "accepted",
+                  accepted_at: new Date().toISOString()
+                })
+                .eq("id", invitation.id);
+
+              if (updateInvitationError) {
+                console.error("Error updating invitation status:", updateInvitationError);
+                // Don't throw here for non-critical invitation status update
+              }
+            }
+          }
+        } catch (roleAssignmentError) {
+          // If role assignment fails, we should clean up the created user to prevent inconsistent state
+          console.error("Role assignment failed, cleaning up user:", roleAssignmentError);
+
+          await supabase
+            .from("users")
+            .delete()
+            .eq("id", user.id);
+
+          throw roleAssignmentError;
+        }
       }
     }
 
-    console.log("Successfully created user and assigned role");
+    // Update Clerk metadata with role information
+    if (orgId && user) {
+      const clerk = await clerkClient();
+      await clerk.users.updateUser(clerkUser.id, {
+        publicMetadata: {
+          organisation_id: orgId,
+          role: userRole
+        }
+      });
+    }
+
+    console.log(`Successfully created user ${email} with role ${userRole}`);
   } catch (error) {
     console.error("Error in handleUserCreated:", error);
     throw error;

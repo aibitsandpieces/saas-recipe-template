@@ -83,7 +83,9 @@
       "Bash(cmd //c \"TASKKILL /F /PID 33008\")",
       "mcp__plugin_context7_context7__resolve-library-id",
       "mcp__plugin_context7_context7__query-docs",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(wc:*)",
+      "Bash(npx shadcn@latest add:*)"
     ]
   }
 }
