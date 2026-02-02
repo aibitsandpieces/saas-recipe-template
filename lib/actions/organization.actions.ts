@@ -1,6 +1,6 @@
 "use server"
 
-import { requirePlatformAdmin, requireUserWithOrg } from "@/lib/auth/user"
+import { requirePlatformAdmin, requireUserWithOrg, getCurrentUser } from "@/lib/auth/user"
 import { createSupabaseClient } from "@/lib/supabase"
 import { revalidatePath } from "next/cache"
 import { z } from "zod"
@@ -255,6 +255,45 @@ export async function getOrganizationUsers(organizationId: string): Promise<User
   }
 
   return users || []
+}
+
+/**
+ * Get organizations for dropdown selection (admin users only)
+ */
+export async function getOrganizationsForDropdown(): Promise<{ id: string; name: string }[]> {
+  const user = await getCurrentUser()
+
+  if (!user) {
+    throw new Error("Unauthorized: Authentication required")
+  }
+
+  // Platform admins can see all organizations, org admins see only their own
+  const hasAdminAccess = user.roles.includes("platform_admin") || user.roles.includes("org_admin")
+
+  if (!hasAdminAccess) {
+    throw new Error("Forbidden: Admin privileges required")
+  }
+
+  const supabase = await createSupabaseClient()
+
+  let query = supabase
+    .from("organisations")
+    .select("id, name")
+    .order("name", { ascending: true })
+
+  // If not platform admin, restrict to their organization only
+  if (!user.roles.includes("platform_admin") && user.organisationId) {
+    query = query.eq("id", user.organisationId)
+  }
+
+  const { data: organizations, error } = await query
+
+  if (error) {
+    console.error("Error fetching organizations for dropdown:", error)
+    throw new Error("Failed to fetch organizations")
+  }
+
+  return organizations || []
 }
 
 /**

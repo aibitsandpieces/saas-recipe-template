@@ -125,10 +125,10 @@ export interface CSVWorkflowRow {
   ai_mba: string;       // Maps to category
   category: string;     // Maps to department
   topic: string;        // Maps to workflow name
-  workflow: string;     // Maps to content file/description
-  course: string;       // Maps to source_book
-  author: string;       // Maps to source_author
-  link: string;         // Maps to external_url
+  workflow?: string;    // Maps to content file/description
+  course?: string;      // Maps to source_book
+  author?: string;      // Maps to source_author
+  link?: string;        // Maps to external_url
 }
 
 export interface ImportError {
@@ -186,4 +186,127 @@ export interface WorkflowCategoryWithDepartments extends WorkflowCategory {
   departments: (WorkflowDepartment & {
     workflows?: Workflow[];
   })[];
+}
+
+// Phase C: User Management System Types
+
+export interface UserInvitation {
+  id?: string;
+  email: string;
+  organisation_id: string;
+  role_name: 'org_admin' | 'org_member';
+  status: 'pending' | 'accepted' | 'expired' | 'failed';
+  clerk_invitation_id?: string;
+  courses: string[]; // Array of course IDs for individual enrollment
+  invited_by: string;
+  invited_at?: string;
+  accepted_at?: string;
+  expires_at?: string;
+  // Extended properties added by server actions
+  inviterName?: string;
+  organisationName?: string;
+  courseNames?: string[];
+}
+
+export interface CourseUserEnrollment {
+  id?: string;
+  user_id: string;
+  course_id: string;
+  enrolled_by: string;
+  enrolled_at?: string;
+  // Extended properties added by server actions
+  userName?: string;
+  courseName?: string;
+  enrolledByName?: string;
+}
+
+export interface UserWithRole {
+  id: string;
+  clerk_id: string;
+  email?: string;
+  name?: string;
+  organisation_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  // Extended properties added by server actions
+  role?: string;
+  organisationName?: string;
+  courseEnrollments?: CourseUserEnrollment[];
+  invitationStatus?: 'invited' | 'registered';
+}
+
+// CSV User Import Types
+export interface CSVUserRow {
+  email: string;        // User email (required, must be unique within org)
+  name: string;         // User full name (required)
+  role: 'org_admin' | 'org_member'; // User role (required)
+  organisation: string; // Organisation name (required, must exist)
+  courses?: string;     // Comma-separated course names for individual enrollment (optional)
+}
+
+export interface UserImportError {
+  row: number;
+  field?: string;
+  message: string;
+  value?: any;
+}
+
+export interface UserImportPreviewResult {
+  isValid: boolean;
+  totalRows: number;
+  validRows: number;
+  errors: UserImportError[];
+  summary: {
+    usersToInvite: number;
+    organisationsFound: string[];
+    coursesFound: string[];
+    rolesAssigned: { [role: string]: number };
+    duplicateEmails: string[];
+  };
+  sampleData: CSVUserRow[];
+}
+
+export interface UserImportLog {
+  id?: string;
+  file_name: string;
+  total_rows: number;
+  successful_invitations: number;
+  failed_invitations: number;
+  organisations_processed: number;
+  individual_enrollments: number;
+  error_summary?: any;
+  imported_by?: string;
+  started_at?: string;
+  completed_at?: string;
+  // Extended properties added by server actions
+  importerName?: string;
+  duration?: number;
+  status?: 'pending' | 'completed' | 'failed';
+}
+
+// User Management Search and Filters
+export interface UserSearchFilters {
+  query?: string;
+  organisationId?: string;
+  role?: string;
+  invitationStatus?: 'all' | 'pending' | 'accepted' | 'expired';
+  hasIndividualEnrollments?: boolean;
+  // Pagination parameters
+  page?: number;
+  limit?: number;
+}
+
+export interface UserSearchResult {
+  users: UserWithRole[];
+  invitations: UserInvitation[];
+  totalUserCount: number;
+  totalInvitationCount: number;
+  // Pagination metadata
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 }

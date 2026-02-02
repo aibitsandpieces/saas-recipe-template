@@ -116,7 +116,7 @@ export async function getWorkflowCategoriesWithDepartments(): Promise<WorkflowCa
   return categories?.map(category => ({
     ...category,
     departmentCount: category.workflow_departments?.length || 0,
-    departments: (category.workflow_departments || []).map(dept => ({
+    departments: (category.workflow_departments || []).map((dept: any) => ({
       ...dept,
       workflowCount: dept.workflows?.length || 0,
       workflows: dept.workflows || []
@@ -717,20 +717,28 @@ export async function deleteWorkflowsByCategory(categoryId: string): Promise<{ d
     throw new Error("Failed to count workflows in category")
   }
 
-  // Delete workflows in the category
-  const { error } = await supabase
-    .from("workflows")
-    .delete()
-    .in("department_id",
-      supabase
-        .from("workflow_departments")
-        .select("id")
-        .eq("category_id", categoryId)
-    )
+  // First get the department IDs to delete workflows from
+  const { data: departmentIds, error: deptError } = await supabase
+    .from("workflow_departments")
+    .select("id")
+    .eq("category_id", categoryId)
 
-  if (error) {
-    console.error("Error deleting workflows by category:", error)
-    throw new Error("Failed to delete workflows in category")
+  if (deptError) {
+    console.error("Error fetching department IDs:", deptError)
+    throw new Error("Failed to fetch department IDs for deletion")
+  }
+
+  // Delete workflows in the category departments
+  if (departmentIds && departmentIds.length > 0) {
+    const { error } = await supabase
+      .from("workflows")
+      .delete()
+      .in("department_id", departmentIds.map(d => d.id))
+
+    if (error) {
+      console.error("Error deleting workflows by category:", error)
+      throw new Error("Failed to delete workflows in category")
+    }
   }
 
   revalidatePath("/admin/workflows")

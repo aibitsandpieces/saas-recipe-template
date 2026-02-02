@@ -49,7 +49,8 @@ export async function previewCSVImport(csvData: CSVWorkflowRow[]): Promise<Impor
   const existingDepartmentMap = new Map()
 
   existingDepartments?.forEach(dept => {
-    const categoryName = dept.workflow_categories?.name?.toLowerCase()
+    const category = dept.workflow_categories as any
+    const categoryName = category?.name?.toLowerCase()
     if (categoryName && dept.name) {
       existingDepartmentMap.set(`${categoryName}:${dept.name.toLowerCase()}`, true)
     }
@@ -295,7 +296,8 @@ async function executeImportTransaction(
 
     // Populate existing departments map
     existingDepartments?.forEach(dept => {
-      const categoryName = dept.workflow_categories?.name?.toLowerCase()
+      const category = dept.workflow_categories as any
+      const categoryName = category?.name?.toLowerCase()
       if (categoryName && dept.name) {
         departmentMap.set(`${categoryName}:${dept.name.toLowerCase()}`, dept.id)
       }
