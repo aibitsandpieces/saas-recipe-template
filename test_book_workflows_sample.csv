@@ -1,0 +1,21 @@
+department,category,book,author,workflow,activity_type,problem_goal
+Sales,Prospecting & Lead Generation,SPIN Selling,Neil Rackham,Need-Payoff Proposition Builder,Create,Grow
+Sales,Prospecting & Lead Generation,SPIN Selling,Neil Rackham,Situation Question Generator,Create,Understand
+Sales,Closing Deals,The Challenger Sale,Matthew Dixon,Challenger Teaching Framework,Workshop,Lead
+Marketing,Content Strategy,Content Inc,Joe Pulizzi,Blog Post Generator,Create,Understand
+Marketing,Content Strategy,Content Inc,Joe Pulizzi,Content Calendar Planner,Plan,Grow
+Marketing,Brand Strategy,Building a StoryBrand,Donald Miller,StoryBrand Framework,Create,Grow
+HR / People,Performance Management,Radical Candor,Kim Scott,Feedback Conversation Guide,Create,Lead
+HR / People,Performance Management,Radical Candor,Kim Scott,Performance Review Template,Assess,Optimise
+HR / People,Hiring & Recruiting,Who by Geoff Smart,Geoff Smart,A-Player Interview Process,Assess,Grow
+Finance,Budgeting & Planning,Zero Based Budgeting,Pete Pyhrr,Zero-Based Budget Builder,Plan,Optimise
+Finance,Financial Analysis,Financial Intelligence,Karen Berman,Financial Statement Analyzer,Assess,Understand
+Operations,Process Improvement,The Lean Startup,Eric Ries,Build-Measure-Learn Cycle,Plan,Innovate
+Operations,Process Improvement,The Lean Startup,Eric Ries,MVP Development Framework,Create,Innovate
+Operations,Quality Management,Six Sigma for Dummies,Craig Gygi,DMAIC Process Template,Plan,Optimise
+Strategy,Corporate Vision,Good to Great,Jim Collins,Hedgehog Concept Workshop,Workshop,Strategise
+Strategy,Corporate Vision,Good to Great,Jim Collins,Flywheel Assessment Tool,Assess,Strategise
+Strategy,Competitive Analysis,Blue Ocean Strategy,W. Chan Kim,Blue Ocean Canvas,Create,Innovate
+Leadership,Team Building,The Five Dysfunctions of a Team,Patrick Lencioni,Team Assessment Survey,Assess,Lead
+Leadership,Team Building,The Five Dysfunctions of a Team,Patrick Lencioni,Trust Building Exercises,Workshop,Lead
+Leadership,Decision Making,Decisive by Chip Heath,Chip Heath,WRAP Decision Framework,Plan,Lead
