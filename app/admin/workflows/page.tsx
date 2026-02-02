@@ -1,5 +1,7 @@
 import { getWorkflowCategoriesWithDepartments, searchWorkflows } from "@/lib/actions/workflow.actions"
 import { getImportLogs } from "@/lib/actions/csv-import.actions"
+import { WorkflowActionsDropdown } from "@/components/admin/WorkflowActionsDropdown"
+import { WorkflowBulkActions } from "@/components/admin/WorkflowBulkActions"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -47,6 +49,10 @@ export default async function WorkflowsAdminPage() {
           </p>
         </div>
         <div className="flex space-x-2">
+          <WorkflowBulkActions
+            totalWorkflows={totalWorkflows}
+            onActionComplete={() => window.location.reload()}
+          />
           <Button asChild variant="outline">
             <Link href="/admin/workflows/import">
               <Upload className="mr-2 h-4 w-4" />
@@ -258,11 +264,11 @@ export default async function WorkflowsAdminPage() {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button asChild variant="ghost" size="sm">
-                          <Link href={`/admin/workflows/${workflow.id}/edit`}>
-                            Edit
-                          </Link>
-                        </Button>
+                        <WorkflowActionsDropdown
+                          workflowId={workflow.id!}
+                          workflowName={workflow.name}
+                          onDeleted={() => window.location.reload()}
+                        />
                       </TableCell>
                     </TableRow>
                   ))

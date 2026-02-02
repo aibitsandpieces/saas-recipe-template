@@ -625,3 +625,182 @@ export async function deleteWorkflowFile(id: string): Promise<void> {
   revalidatePath("/admin/workflows")
   revalidatePath("/workflows")
 }
+
+/**
+ * Bulk deletion functions for testing/resetting workflow data
+ */
+
+/**
+ * Delete all workflows in a specific category (admin only)
+ */
+export async function deleteWorkflowsByCategory(categoryId: string): Promise<{ deletedCount: number }> {
+  await requirePlatformAdmin()
+
+  const supabase = await createSupabaseClient()
+
+  // First get count of workflows to delete
+  const { data: workflows, error: countError } = await supabase
+    .from("workflows")
+    .select("id")
+    .eq("department_id", categoryId)
+
+  if (countError) {
+    console.error("Error counting workflows by category:", countError)
+    throw new Error("Failed to count workflows in category")
+  }
+
+  // Delete workflows in the category
+  const { error } = await supabase
+    .from("workflows")
+    .delete()
+    .in("department_id",
+      supabase
+        .from("workflow_departments")
+        .select("id")
+        .eq("category_id", categoryId)
+    )
+
+  if (error) {
+    console.error("Error deleting workflows by category:", error)
+    throw new Error("Failed to delete workflows in category")
+  }
+
+  revalidatePath("/admin/workflows")
+  revalidatePath("/workflows")
+
+  return { deletedCount: workflows?.length || 0 }
+}
+
+/**
+ * Delete all workflows in a specific department (admin only)
+ */
+export async function deleteWorkflowsByDepartment(departmentId: string): Promise<{ deletedCount: number }> {
+  await requirePlatformAdmin()
+
+  const supabase = await createSupabaseClient()
+
+  // First get count of workflows to delete
+  const { data: workflows, error: countError } = await supabase
+    .from("workflows")
+    .select("id")
+    .eq("department_id", departmentId)
+
+  if (countError) {
+    console.error("Error counting workflows by department:", countError)
+    throw new Error("Failed to count workflows in department")
+  }
+
+  // Delete workflows in the department
+  const { error } = await supabase
+    .from("workflows")
+    .delete()
+    .eq("department_id", departmentId)
+
+  if (error) {
+    console.error("Error deleting workflows by department:", error)
+    throw new Error("Failed to delete workflows in department")
+  }
+
+  revalidatePath("/admin/workflows")
+  revalidatePath("/workflows")
+
+  return { deletedCount: workflows?.length || 0 }
+}
+
+/**
+ * Delete ALL workflows (admin only) - for testing/reset purposes
+ */
+export async function deleteAllWorkflows(): Promise<{ deletedCount: number }> {
+  await requirePlatformAdmin()
+
+  const supabase = await createSupabaseClient()
+
+  // First get count of workflows to delete
+  const { data: workflows, error: countError } = await supabase
+    .from("workflows")
+    .select("id")
+
+  if (countError) {
+    console.error("Error counting all workflows:", countError)
+    throw new Error("Failed to count workflows")
+  }
+
+  // Delete all workflows (files will be cascade deleted by foreign key constraints)
+  const { error } = await supabase
+    .from("workflows")
+    .delete()
+    .neq("id", "")  // Delete all rows
+
+  if (error) {
+    console.error("Error deleting all workflows:", error)
+    throw new Error("Failed to delete all workflows")
+  }
+
+  revalidatePath("/admin/workflows")
+  revalidatePath("/workflows")
+
+  return { deletedCount: workflows?.length || 0 }
+}
+
+/**
+ * Complete reset - delete all workflow data (admin only)
+ * Useful for fresh CSV imports
+ */
+export async function resetWorkflowLibrary(): Promise<{
+  deletedWorkflows: number
+  deletedDepartments: number
+  deletedCategories: number
+}> {
+  await requirePlatformAdmin()
+
+  const supabase = await createSupabaseClient()
+
+  // Get counts before deletion
+  const [workflowsResult, departmentsResult, categoriesResult] = await Promise.all([
+    supabase.from("workflows").select("id"),
+    supabase.from("workflow_departments").select("id"),
+    supabase.from("workflow_categories").select("id")
+  ])
+
+  if (workflowsResult.error || departmentsResult.error || categoriesResult.error) {
+    throw new Error("Failed to count existing data")
+  }
+
+  // Delete in reverse order (workflows -> departments -> categories)
+  // Due to foreign key constraints
+  const deleteWorkflows = await supabase
+    .from("workflows")
+    .delete()
+    .neq("id", "")
+
+  if (deleteWorkflows.error) {
+    throw new Error("Failed to delete workflows")
+  }
+
+  const deleteDepartments = await supabase
+    .from("workflow_departments")
+    .delete()
+    .neq("id", "")
+
+  if (deleteDepartments.error) {
+    throw new Error("Failed to delete departments")
+  }
+
+  const deleteCategories = await supabase
+    .from("workflow_categories")
+    .delete()
+    .neq("id", "")
+
+  if (deleteCategories.error) {
+    throw new Error("Failed to delete categories")
+  }
+
+  revalidatePath("/admin/workflows")
+  revalidatePath("/workflows")
+
+  return {
+    deletedWorkflows: workflowsResult.data?.length || 0,
+    deletedDepartments: departmentsResult.data?.length || 0,
+    deletedCategories: categoriesResult.data?.length || 0
+  }
+}
