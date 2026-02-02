@@ -257,38 +257,70 @@ export async function searchWorkflows(filters: WorkflowSearchFilters): Promise<W
   const limit = filters.limit || 20
   const offset = (page - 1) * limit
 
+  // Handle categoryId filter - fetch departments once if needed
+  let departmentIds: string[] | null = null
+  if (filters.categoryId) {
+    const { data: departments, error: deptError } = await supabase
+      .from("workflow_departments")
+      .select("id")
+      .eq("category_id", filters.categoryId)
+
+    if (deptError) {
+      console.error("Error fetching departments for category:", deptError)
+      throw new Error(`Failed to filter by category: ${deptError.message}`)
+    }
+
+    departmentIds = departments?.map(d => d.id) || []
+
+    if (departmentIds.length === 0) {
+      console.warn(`No departments found for category ${filters.categoryId}`)
+    }
+  }
+
+  // Helper function to apply filters to both count and main queries
+  const applyFilters = (query: any) => {
+    if (filters.categoryId) {
+      if (departmentIds && departmentIds.length > 0) {
+        query = query.in("department_id", departmentIds)
+      } else {
+        // No departments in category = no results
+        query = query.eq("id", "00000000-0000-0000-0000-000000000000")
+      }
+    }
+
+    if (filters.departmentId) {
+      query = query.eq("department_id", filters.departmentId)
+    }
+
+    if (filters.sourceAuthor) {
+      query = query.ilike("source_author", `%${filters.sourceAuthor}%`)
+    }
+
+    if (filters.sourceBook) {
+      query = query.ilike("source_book", `%${filters.sourceBook}%`)
+    }
+
+    if (filters.isPublished !== undefined) {
+      query = query.eq("is_published", filters.isPublished)
+    }
+
+    if (filters.query) {
+      query = query.textSearch("search_vector", filters.query, {
+        type: "websearch",
+        config: "english"
+      })
+    }
+
+    return query
+  }
+
   // First, get the total count for pagination
   let countQuery = supabase
     .from("workflows")
     .select("id", { count: "exact", head: true })
 
-  // Apply the same filters to count query
-  if (filters.categoryId) {
-    countQuery = countQuery.eq("workflow_departments.category_id", filters.categoryId)
-  }
-
-  if (filters.departmentId) {
-    countQuery = countQuery.eq("department_id", filters.departmentId)
-  }
-
-  if (filters.sourceAuthor) {
-    countQuery = countQuery.ilike("source_author", `%${filters.sourceAuthor}%`)
-  }
-
-  if (filters.sourceBook) {
-    countQuery = countQuery.ilike("source_book", `%${filters.sourceBook}%`)
-  }
-
-  if (filters.isPublished !== undefined) {
-    countQuery = countQuery.eq("is_published", filters.isPublished)
-  }
-
-  if (filters.query) {
-    countQuery = countQuery.textSearch("search_vector", filters.query, {
-      type: "websearch",
-      config: "english"
-    })
-  }
+  // Apply filters to count query
+  countQuery = applyFilters(countQuery)
 
   // Get total count
   const { count: totalCount, error: countError } = await countQuery
@@ -316,34 +348,8 @@ export async function searchWorkflows(filters: WorkflowSearchFilters): Promise<W
       )
     `)
 
-  // Apply filters
-  if (filters.categoryId) {
-    query = query.eq("workflow_departments.category_id", filters.categoryId)
-  }
-
-  if (filters.departmentId) {
-    query = query.eq("department_id", filters.departmentId)
-  }
-
-  if (filters.sourceAuthor) {
-    query = query.ilike("source_author", `%${filters.sourceAuthor}%`)
-  }
-
-  if (filters.sourceBook) {
-    query = query.ilike("source_book", `%${filters.sourceBook}%`)
-  }
-
-  if (filters.isPublished !== undefined) {
-    query = query.eq("is_published", filters.isPublished)
-  }
-
-  // Full-text search
-  if (filters.query) {
-    query = query.textSearch("search_vector", filters.query, {
-      type: "websearch",
-      config: "english"
-    })
-  }
+  // Apply filters to main query
+  query = applyFilters(query)
 
   // Order by relevance if searching, otherwise by sort order
   if (filters.query) {
