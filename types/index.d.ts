@@ -161,6 +161,9 @@ export interface WorkflowSearchFilters {
   sourceAuthor?: string;
   sourceBook?: string;
   isPublished?: boolean;
+  // Pagination parameters
+  page?: number;
+  limit?: number;
 }
 
 export interface WorkflowSearchResult {
@@ -168,6 +171,14 @@ export interface WorkflowSearchResult {
   totalCount: number;
   categories: WorkflowCategory[];
   departments: WorkflowDepartment[];
+  // Pagination metadata
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
 }
 
 // Hierarchical Workflow Types (for navigation)

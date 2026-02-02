@@ -30,7 +30,7 @@ export default async function WorkflowsAdminPage() {
   // Fetch all data needed for the dashboard
   const [categoriesWithDepartments, allWorkflows, recentImportLogs] = await Promise.all([
     getWorkflowCategoriesWithDepartments(),
-    searchWorkflows({}),
+    searchWorkflows({ limit: 20, page: 1 }), // Show first 20 workflows for overview
     getImportLogs()
   ])
 
@@ -273,10 +273,12 @@ export default async function WorkflowsAdminPage() {
                 )}
               </TableBody>
             </Table>
-            {allWorkflows.workflows.length > 20 && (
+            {allWorkflows.pagination.hasNextPage && (
               <div className="p-4 text-center">
                 <Button asChild variant="outline">
-                  <Link href="/admin/workflows/all">View All Workflows</Link>
+                  <Link href="/admin/workflows/all">
+                    View All Workflows ({allWorkflows.totalCount} total)
+                  </Link>
                 </Button>
               </div>
             )}

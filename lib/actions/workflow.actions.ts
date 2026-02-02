@@ -247,11 +247,58 @@ export async function getWorkflow(id: string): Promise<Workflow | null> {
 }
 
 /**
- * Search workflows with filters
+ * Search workflows with filters and pagination
  */
 export async function searchWorkflows(filters: WorkflowSearchFilters): Promise<WorkflowSearchResult> {
   const supabase = await createSupabaseClient()
 
+  // Pagination parameters with defaults
+  const page = filters.page || 1
+  const limit = filters.limit || 20
+  const offset = (page - 1) * limit
+
+  // First, get the total count for pagination
+  let countQuery = supabase
+    .from("workflows")
+    .select("id", { count: "exact", head: true })
+
+  // Apply the same filters to count query
+  if (filters.categoryId) {
+    countQuery = countQuery.eq("workflow_departments.category_id", filters.categoryId)
+  }
+
+  if (filters.departmentId) {
+    countQuery = countQuery.eq("department_id", filters.departmentId)
+  }
+
+  if (filters.sourceAuthor) {
+    countQuery = countQuery.ilike("source_author", `%${filters.sourceAuthor}%`)
+  }
+
+  if (filters.sourceBook) {
+    countQuery = countQuery.ilike("source_book", `%${filters.sourceBook}%`)
+  }
+
+  if (filters.isPublished !== undefined) {
+    countQuery = countQuery.eq("is_published", filters.isPublished)
+  }
+
+  if (filters.query) {
+    countQuery = countQuery.textSearch("search_vector", filters.query, {
+      type: "websearch",
+      config: "english"
+    })
+  }
+
+  // Get total count
+  const { count: totalCount, error: countError } = await countQuery
+
+  if (countError) {
+    console.error("Error counting workflows:", countError)
+    throw new Error("Failed to count workflows")
+  }
+
+  // Build the main query for paginated results
   let query = supabase
     .from("workflows")
     .select(`
@@ -306,6 +353,9 @@ export async function searchWorkflows(filters: WorkflowSearchFilters): Promise<W
     query = query.order("name", { ascending: true })
   }
 
+  // Apply pagination
+  query = query.range(offset, offset + limit - 1)
+
   const { data: workflows, error } = await query
 
   if (error) {
@@ -321,6 +371,11 @@ export async function searchWorkflows(filters: WorkflowSearchFilters): Promise<W
 
   const [categories, departments] = await Promise.all([categoriesPromise, departmentsPromise])
 
+  // Calculate pagination metadata
+  const totalPages = Math.ceil((totalCount || 0) / limit)
+  const hasNextPage = page < totalPages
+  const hasPreviousPage = page > 1
+
   return {
     workflows: workflows?.map(workflow => ({
       ...workflow,
@@ -329,9 +384,16 @@ export async function searchWorkflows(filters: WorkflowSearchFilters): Promise<W
       categoryId: workflow.workflow_departments?.workflow_categories?.id,
       fileCount: workflow.workflow_files?.length || 0
     })) || [],
-    totalCount: workflows?.length || 0,
+    totalCount: totalCount || 0,
     categories,
-    departments
+    departments,
+    pagination: {
+      page,
+      limit,
+      totalPages,
+      hasNextPage,
+      hasPreviousPage
+    }
   }
 }
 

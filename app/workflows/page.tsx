@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { WorkflowPagination } from "@/components/ui/workflow-pagination"
 import {
   FolderTree,
   Building2,
@@ -19,6 +20,7 @@ interface WorkflowsPageProps {
     q?: string
     category?: string
     department?: string
+    page?: string
   }>
 }
 
@@ -28,12 +30,15 @@ export default async function WorkflowsPage({ searchParams }: WorkflowsPageProps
   // Get all categories with departments for navigation
   const categoriesWithDepartments = await getWorkflowCategoriesWithDepartments()
 
-  // Get search results if there's a query, otherwise show all published workflows
+  // Get search results with pagination
+  const page = params.page ? parseInt(params.page) : 1
   const searchResults = await searchWorkflows({
     query: params.q,
     categoryId: params.category,
     departmentId: params.department,
-    isPublished: true // Only show published workflows to public
+    isPublished: true, // Only show published workflows to public
+    page,
+    limit: 12 // Show 12 workflows per page
   })
 
   const totalWorkflows = searchResults.totalCount
@@ -289,14 +294,15 @@ export default async function WorkflowsPage({ searchParams }: WorkflowsPageProps
                   ))}
                 </div>
 
-                {/* Load More / Pagination could go here */}
-                {searchResults.workflows.length >= 50 && (
-                  <div className="text-center pt-6">
-                    <p className="text-sm text-gray-500">
-                      Showing first 50 results. Use search and filters to narrow down your results.
-                    </p>
-                  </div>
-                )}
+                {/* Pagination */}
+                <WorkflowPagination
+                  currentPage={searchResults.pagination.page}
+                  totalPages={searchResults.pagination.totalPages}
+                  hasNextPage={searchResults.pagination.hasNextPage}
+                  hasPreviousPage={searchResults.pagination.hasPreviousPage}
+                  totalCount={searchResults.totalCount}
+                  itemsPerPage={searchResults.pagination.limit}
+                />
               </div>
             )}
           </div>
