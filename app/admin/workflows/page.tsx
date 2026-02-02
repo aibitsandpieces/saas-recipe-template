@@ -51,7 +51,6 @@ export default async function WorkflowsAdminPage() {
         <div className="flex space-x-2">
           <WorkflowBulkActions
             totalWorkflows={totalWorkflows}
-            onActionComplete={() => window.location.reload()}
           />
           <Button asChild variant="outline">
             <Link href="/admin/workflows/import">
@@ -267,7 +266,6 @@ export default async function WorkflowsAdminPage() {
                         <WorkflowActionsDropdown
                           workflowId={workflow.id!}
                           workflowName={workflow.name}
-                          onDeleted={() => window.location.reload()}
                         />
                       </TableCell>
                     </TableRow>

@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -37,15 +38,14 @@ import {
 
 interface WorkflowBulkActionsProps {
   totalWorkflows: number
-  onActionComplete?: () => void
 }
 
 type BulkAction = "delete_all" | "reset_all" | null
 
 export function WorkflowBulkActions({
-  totalWorkflows,
-  onActionComplete
+  totalWorkflows
 }: WorkflowBulkActionsProps) {
+  const router = useRouter()
   const [currentAction, setCurrentAction] = useState<BulkAction>(null)
   const [confirmationText, setConfirmationText] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
@@ -57,10 +57,27 @@ export function WorkflowBulkActions({
       toast.success(`Successfully deleted ${result.deletedCount} workflows`)
       setCurrentAction(null)
       setConfirmationText("")
-      onActionComplete?.()
+      router.refresh()
     } catch (error) {
       console.error("Delete all failed:", error)
-      toast.error("Failed to delete workflows")
+
+      // Enhanced error handling based on improved backend error messages
+      let errorMessage = "Failed to delete workflows"
+
+      if (error instanceof Error) {
+        if (error.message.includes('policy violation') || error.message.includes('RLS policy')) {
+          errorMessage = "Database permission error. Please check administrator privileges and RLS policies."
+        } else if (error.message.includes('foreign key constraint')) {
+          errorMessage = "Database constraint error. Some workflow files may be blocking deletion."
+        } else if (error.message.includes('cannot access workflow_files')) {
+          errorMessage = "Database access error. Administrator permissions may be misconfigured."
+        } else if (error.message.length < 100) {
+          // If it's a short, specific error message, show it to the user
+          errorMessage = error.message
+        }
+      }
+
+      toast.error(errorMessage)
     } finally {
       setIsProcessing(false)
     }
@@ -75,7 +92,7 @@ export function WorkflowBulkActions({
       )
       setCurrentAction(null)
       setConfirmationText("")
-      onActionComplete?.()
+      router.refresh()
     } catch (error) {
       console.error("Reset failed:", error)
       toast.error("Failed to reset workflow library")

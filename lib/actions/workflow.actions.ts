@@ -708,38 +708,139 @@ export async function deleteWorkflowsByDepartment(departmentId: string): Promise
 }
 
 /**
+ * Verify that the current user has proper permissions for bulk operations
+ * and that RLS policies are configured correctly
+ */
+async function verifyBulkDeletionPermissions(): Promise<void> {
+  const user = await requirePlatformAdmin()
+  const supabase = await createSupabaseClient()
+
+  // Test if we can access workflow files (should work for platform admin)
+  const { error: testError } = await supabase
+    .from("workflow_files")
+    .select("id")
+    .limit(1)
+
+  if (testError) {
+    console.error("RLS policy test failed for workflow_files:", testError)
+    throw new Error(`Platform admin cannot access workflow_files table. RLS policy may be misconfigured: ${testError.message}`)
+  }
+
+  console.log(`Platform admin ${user.email} verified for bulk operations`)
+}
+
+/**
  * Delete ALL workflows (admin only) - for testing/reset purposes
  */
 export async function deleteAllWorkflows(): Promise<{ deletedCount: number }> {
-  await requirePlatformAdmin()
+  // Verify permissions and RLS policies
+  await verifyBulkDeletionPermissions()
 
   const supabase = await createSupabaseClient()
 
-  // First get count of workflows to delete
+  // Get count of workflows to be deleted
   const { data: workflows, error: countError } = await supabase
     .from("workflows")
     .select("id")
 
   if (countError) {
-    console.error("Error counting all workflows:", countError)
-    throw new Error("Failed to count workflows")
+    console.error("Error counting workflows:", countError)
+    throw new Error(`Failed to count workflows: ${countError.message}`)
   }
 
-  // Delete all workflows (files will be cascade deleted by foreign key constraints)
-  const { error } = await supabase
+  // Log the operation for audit trail
+  console.log(`Platform admin initiating bulk deletion of ${workflows?.length || 0} workflows`)
+
+  try {
+    // Delete all workflows (files should cascade delete via foreign key constraints)
+    const { error } = await supabase
+      .from("workflows")
+      .delete()
+      .gte("created_at", "1900-01-01")  // Delete all rows (using a condition that matches all records)
+
+    if (error) {
+      console.error("Detailed deletion error:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      })
+
+      // Specific handling for RLS/permission violations
+      if (error.code === '42501' || error.message.includes('policy') || error.message.includes('permission')) {
+        throw new Error(`Database policy violation during bulk delete. This may indicate RLS policy issues with cascading operations. Original error: ${error.message}`)
+      }
+
+      // Specific handling for foreign key constraint issues
+      if (error.code === '23503' || error.message.includes('foreign key')) {
+        throw new Error(`Foreign key constraint violation during bulk delete. Some workflow files may be blocking deletion. Original error: ${error.message}`)
+      }
+
+      throw new Error(`Failed to delete all workflows: ${error.message}`)
+    }
+
+    revalidatePath("/admin/workflows")
+    revalidatePath("/workflows")
+
+    return { deletedCount: workflows?.length || 0 }
+  } catch (dbError) {
+    console.error("Database operation failed:", dbError)
+    throw dbError
+  }
+}
+
+/**
+ * Alternative implementation with explicit deletion sequencing
+ * Use this if cascading deletes continue to fail due to RLS policy issues
+ */
+export async function deleteAllWorkflowsExplicit(): Promise<{ deletedCount: number }> {
+  await requirePlatformAdmin()
+  const supabase = await createSupabaseClient()
+
+  // Get count first
+  const { data: workflows, error: countError } = await supabase
     .from("workflows")
-    .delete()
-    .neq("id", "")  // Delete all rows
+    .select("id")
 
-  if (error) {
-    console.error("Error deleting all workflows:", error)
-    throw new Error("Failed to delete all workflows")
+  if (countError) {
+    throw new Error(`Failed to count workflows: ${countError.message}`)
   }
 
-  revalidatePath("/admin/workflows")
-  revalidatePath("/workflows")
+  console.log(`Platform admin initiating explicit bulk deletion of ${workflows?.length || 0} workflows`)
 
-  return { deletedCount: workflows?.length || 0 }
+  // Explicit deletion sequence to avoid RLS cascading issues
+  try {
+    // Step 1: Delete all workflow files explicitly
+    const { error: filesError } = await supabase
+      .from("workflow_files")
+      .delete()
+      .gte("created_at", "1900-01-01")
+
+    if (filesError) {
+      console.error("Failed to delete workflow files:", filesError)
+      throw new Error(`Failed to delete workflow files: ${filesError.message}`)
+    }
+
+    // Step 2: Delete all workflows
+    const { error: workflowsError } = await supabase
+      .from("workflows")
+      .delete()
+      .gte("created_at", "1900-01-01")
+
+    if (workflowsError) {
+      console.error("Failed to delete workflows:", workflowsError)
+      throw new Error(`Failed to delete workflows: ${workflowsError.message}`)
+    }
+
+    revalidatePath("/admin/workflows")
+    revalidatePath("/workflows")
+
+    console.log(`Successfully deleted ${workflows?.length || 0} workflows and their files`)
+    return { deletedCount: workflows?.length || 0 }
+  } catch (error) {
+    console.error("Manual deletion sequence failed:", error)
+    throw error
+  }
 }
 
 /**
@@ -771,7 +872,7 @@ export async function resetWorkflowLibrary(): Promise<{
   const deleteWorkflows = await supabase
     .from("workflows")
     .delete()
-    .neq("id", "")
+    .gte("created_at", "1900-01-01")
 
   if (deleteWorkflows.error) {
     throw new Error("Failed to delete workflows")
@@ -780,7 +881,7 @@ export async function resetWorkflowLibrary(): Promise<{
   const deleteDepartments = await supabase
     .from("workflow_departments")
     .delete()
-    .neq("id", "")
+    .gte("created_at", "1900-01-01")
 
   if (deleteDepartments.error) {
     throw new Error("Failed to delete departments")
@@ -789,7 +890,7 @@ export async function resetWorkflowLibrary(): Promise<{
   const deleteCategories = await supabase
     .from("workflow_categories")
     .delete()
-    .neq("id", "")
+    .gte("created_at", "1900-01-01")
 
   if (deleteCategories.error) {
     throw new Error("Failed to delete categories")

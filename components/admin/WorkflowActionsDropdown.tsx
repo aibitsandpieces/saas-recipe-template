@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
+import { useRouter } from "next/navigation"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,14 +26,13 @@ import { deleteWorkflow } from "@/lib/actions/workflow.actions"
 interface WorkflowActionsDropdownProps {
   workflowId: string
   workflowName: string
-  onDeleted?: () => void
 }
 
 export function WorkflowActionsDropdown({
   workflowId,
-  workflowName,
-  onDeleted
+  workflowName
 }: WorkflowActionsDropdownProps) {
+  const router = useRouter()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
 
@@ -42,7 +42,7 @@ export function WorkflowActionsDropdown({
       await deleteWorkflow(workflowId)
       toast.success("Workflow deleted successfully")
       setShowDeleteDialog(false)
-      onDeleted?.()
+      router.refresh()
     } catch (error) {
       console.error("Delete failed:", error)
       toast.error("Failed to delete workflow")
