@@ -6,12 +6,14 @@ import { getBookWorkflowCategory, getBooksByCategory } from "@/lib/actions/book-
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { createBookWorkflowLogger } from "@/lib/utils/logger"
+import CategoryErrorState from "./CategoryErrorState"
 
 interface PageProps {
-  params: {
+  params: Promise<{
     departmentSlug: string
     categorySlug: string
-  }
+  }>
 }
 
 function BookCard({ book, departmentSlug, categorySlug }: {
@@ -27,16 +29,16 @@ function BookCard({ book, departmentSlug, categorySlug }: {
             <span className="line-clamp-2">{book.title}</span>
             <div className="text-gray-400">→</div>
           </CardTitle>
-          <CardDescription className="space-y-2">
-            <div className="flex items-center gap-1 text-sm">
+          <div className="text-sm text-muted-foreground space-y-2">
+            <div className="flex items-center gap-1">
               <User className="h-4 w-4" />
               <span className="font-medium">{book.author}</span>
             </div>
-            <div className="flex items-center gap-1 text-sm">
+            <div className="flex items-center gap-1">
               <Target className="h-4 w-4" />
               <span>{book.workflowCount} workflows</span>
             </div>
-          </CardDescription>
+          </div>
         </CardHeader>
       </Card>
     </Link>
@@ -62,64 +64,87 @@ function Breadcrumb({ category }: { category: any }) {
   )
 }
 
-async function CategoryPageContent({ params }: { params: { departmentSlug: string, categorySlug: string } }) {
-  const [category, books] = await Promise.all([
-    getBookWorkflowCategory(params.departmentSlug, params.categorySlug),
-    getBooksByCategory(params.departmentSlug, params.categorySlug)
-  ])
+async function CategoryPageContent({ params }: { params: Promise<{ departmentSlug: string, categorySlug: string }> }) {
+  const { departmentSlug, categorySlug } = await params
 
-  if (!category) {
-    notFound()
-  }
+  try {
+    const [category, books] = await Promise.all([
+      getBookWorkflowCategory(departmentSlug, categorySlug),
+      getBooksByCategory(departmentSlug, categorySlug)
+    ])
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <Breadcrumb category={category} />
+    if (!category) {
+      notFound()
+    }
 
-        <div className="flex items-center gap-4 mb-4">
-          <Link href={`/book-workflows/${params.departmentSlug}`}>
-            <Button variant="ghost" size="sm" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to {category.departmentName}
-            </Button>
-          </Link>
-        </div>
+    // Ensure books is an array (defensive programming)
+    const safeBooks = Array.isArray(books) ? books : []
 
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold">{category.name}</h1>
-          <div className="flex gap-4 text-sm text-gray-600">
-            <span>{books.length} books</span>
-            <span>•</span>
-            <span>{category.workflowCount} workflows</span>
+    const content = (
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="mb-8">
+          <Breadcrumb category={category} />
+
+          <div className="flex items-center gap-4 mb-4">
+            <Link href={`/book-workflows/${departmentSlug}`}>
+              <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                Back to {category.departmentName}
+              </Button>
+            </Link>
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-3xl font-bold">{category.name}</h1>
+            <div className="flex gap-4 text-sm text-gray-600">
+              <span>{safeBooks.length} books</span>
+              <span>•</span>
+              <span>{category.workflowCount} workflows</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Books Grid */}
-      {books.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {books.map((book) => (
-            <BookCard
-              key={book.id}
-              book={book}
-              departmentSlug={params.departmentSlug}
-              categorySlug={params.categorySlug}
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-12">
-          <Book className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No books available</h3>
-          <p className="text-gray-600">
-            This category doesn't have any books yet.
-          </p>
-        </div>
-      )}
-    </div>
-  )
+        {/* Books Grid */}
+        {safeBooks.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {safeBooks.map((book) => (
+              <BookCard
+                key={book.id}
+                book={book}
+                departmentSlug={departmentSlug}
+                categorySlug={categorySlug}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12">
+            <Book className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No books available</h3>
+            <p className="text-gray-600">
+              This category doesn't have any books yet.
+            </p>
+          </div>
+        )}
+      </div>
+    )
+
+    return content
+
+  } catch (error) {
+    // Log structured error data for debugging using the structured logger
+    const logger = createBookWorkflowLogger('CategoryPageContent', {
+      departmentSlug,
+      categorySlug
+    })
+    logger.error(
+      'Failed to render category page content',
+      error instanceof Error ? error : new Error(String(error))
+    )
+
+    // Return user-friendly error state instead of crashing
+    return <CategoryErrorState departmentSlug={departmentSlug} categorySlug={categorySlug} />
+  }
 }
 
 export default function CategoryPage({ params }: PageProps) {

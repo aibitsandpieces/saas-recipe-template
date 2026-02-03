@@ -8,9 +8,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import Link from "next/link"
+import { SearchFiltersClient } from "./search-filters"
 
 interface PageProps {
-  searchParams: { [key: string]: string | string[] | undefined }
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }
 
 const ACTIVITY_TYPES = [
@@ -78,114 +79,6 @@ function DepartmentSidebar({ departments }: { departments: any[] }) {
   )
 }
 
-function SearchFilters({
-  filters,
-  onUpdateFilters
-}: {
-  filters: BookWorkflowSearchFilters
-  onUpdateFilters: (filters: BookWorkflowSearchFilters) => void
-}) {
-  const hasActiveFilters = filters.query || filters.activityType || filters.problemGoal
-
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-4 flex-wrap">
-        <div className="flex-1 min-w-[300px]">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="Search workflows..."
-              value={filters.query || ""}
-              onChange={(e) => onUpdateFilters({ ...filters, query: e.target.value, page: 1 })}
-              className="pl-10"
-            />
-          </div>
-        </div>
-
-        <Select
-          value={filters.activityType || ""}
-          onValueChange={(value) => onUpdateFilters({ ...filters, activityType: value || undefined, page: 1 })}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Activity Type" />
-          </SelectTrigger>
-          <SelectContent>
-            {ACTIVITY_TYPES.map((type) => (
-              <SelectItem key={type.value} value={type.value}>
-                {type.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <Select
-          value={filters.problemGoal || ""}
-          onValueChange={(value) => onUpdateFilters({ ...filters, problemGoal: value || undefined, page: 1 })}
-        >
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Problem/Goal" />
-          </SelectTrigger>
-          <SelectContent>
-            {PROBLEM_GOALS.map((goal) => (
-              <SelectItem key={goal.value} value={goal.value}>
-                {goal.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        {hasActiveFilters && (
-          <Button
-            variant="outline"
-            onClick={() => onUpdateFilters({ page: 1 })}
-            className="flex items-center gap-2"
-          >
-            <X className="h-4 w-4" />
-            Clear Filters
-          </Button>
-        )}
-      </div>
-
-      {hasActiveFilters && (
-        <div className="flex gap-2 flex-wrap">
-          {filters.query && (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              Search: "{filters.query}"
-              <button
-                onClick={() => onUpdateFilters({ ...filters, query: undefined, page: 1 })}
-                className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-          {filters.activityType && (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              Activity: {filters.activityType}
-              <button
-                onClick={() => onUpdateFilters({ ...filters, activityType: undefined, page: 1 })}
-                className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-          {filters.problemGoal && (
-            <Badge variant="secondary" className="flex items-center gap-1">
-              Goal: {filters.problemGoal}
-              <button
-                onClick={() => onUpdateFilters({ ...filters, problemGoal: undefined, page: 1 })}
-                className="ml-1 hover:bg-gray-300 rounded-full p-0.5"
-              >
-                <X className="h-3 w-3" />
-              </button>
-            </Badge>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function WorkflowCard({ workflow }: { workflow: any }) {
   const workflowUrl = `/book-workflows/${workflow.departmentSlug}/${workflow.categorySlug}/${workflow.bookSlug}/${workflow.slug}`
@@ -304,13 +197,15 @@ function DepartmentOverview({ departments }: { departments: any[] }) {
   )
 }
 
-async function BookWorkflowsContent({ searchParams }: { searchParams: any }) {
+
+async function BookWorkflowsContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   // Parse search parameters
+  const params = await searchParams
   const filters: BookWorkflowSearchFilters = {
-    query: searchParams.q || undefined,
-    activityType: searchParams.activity || undefined,
-    problemGoal: searchParams.goal || undefined,
-    page: parseInt(searchParams.page) || 1,
+    query: Array.isArray(params.q) ? params.q[0] : params.q || undefined,
+    activityType: (Array.isArray(params.activity) ? params.activity[0] : params.activity) as 'Create' | 'Assess' | 'Plan' | 'Workshop' | '' | undefined,
+    problemGoal: (Array.isArray(params.goal) ? params.goal[0] : params.goal) as 'Grow' | 'Optimise' | 'Lead' | 'Strategise' | 'Innovate' | 'Understand' | '' | undefined,
+    page: parseInt(Array.isArray(params.page) ? params.page[0] : params.page || '1') || 1,
     limit: 20
   }
 
@@ -336,19 +231,7 @@ async function BookWorkflowsContent({ searchParams }: { searchParams: any }) {
         <div className={hasSearchCriteria ? "lg:col-span-4" : "lg:col-span-3"}>
           {/* Search and Filters */}
           <div className="mb-8">
-            <SearchFilters
-              filters={filters}
-              onUpdateFilters={(newFilters) => {
-                const params = new URLSearchParams()
-                if (newFilters.query) params.set('q', newFilters.query)
-                if (newFilters.activityType) params.set('activity', newFilters.activityType)
-                if (newFilters.problemGoal) params.set('goal', newFilters.problemGoal)
-                if (newFilters.page && newFilters.page > 1) params.set('page', newFilters.page.toString())
-
-                const newUrl = params.toString() ? `?${params.toString()}` : '/book-workflows'
-                window.location.href = newUrl
-              }}
-            />
+            <SearchFiltersClient filters={filters} />
           </div>
 
           {/* Content */}
@@ -363,7 +246,7 @@ async function BookWorkflowsContent({ searchParams }: { searchParams: any }) {
   )
 }
 
-export default function BookWorkflowsPage({ searchParams }: PageProps) {
+export default async function BookWorkflowsPage({ searchParams }: PageProps) {
   return (
     <Suspense fallback={
       <div className="container mx-auto px-4 py-8">

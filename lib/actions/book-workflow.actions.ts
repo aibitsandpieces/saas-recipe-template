@@ -2,6 +2,7 @@
 
 import { requirePlatformAdmin, getCurrentUser } from "@/lib/auth/user"
 import { createSupabaseClient } from "@/lib/supabase"
+import { createBookWorkflowLogger, logError } from "@/lib/utils/logger"
 import {
   BookWorkflowDepartment,
   BookWorkflowCategory,
@@ -140,12 +141,15 @@ export async function getBookWorkflowDepartmentBySlug(slug: string): Promise<Boo
         *,
         book_workflow_categories (
           *,
-          books (
+          book_workflows (
             id,
-            title,
-            slug,
-            author,
-            book_workflows!inner (id)
+            book_id,
+            books (
+              id,
+              title,
+              slug,
+              author
+            )
           )
         )
       `)
@@ -162,10 +166,16 @@ export async function getBookWorkflowDepartmentBySlug(slug: string): Promise<Boo
 
     // Enrich categories with counts
     const enrichedCategories = (department.book_workflow_categories || []).map((cat: any) => {
-      const bookCount = cat.books?.length || 0
-      const workflowCount = cat.books?.reduce((total: number, book: any) => {
-        return total + (book.book_workflows?.length || 0)
-      }, 0) || 0
+      // Get unique books for this category through workflows
+      const uniqueBooks = new Set()
+      cat.book_workflows?.forEach((workflow: any) => {
+        if (workflow.books) {
+          uniqueBooks.add(workflow.books.id)
+        }
+      })
+
+      const bookCount = uniqueBooks.size
+      const workflowCount = cat.book_workflows?.length || 0
 
       return {
         id: cat.id,
@@ -190,7 +200,10 @@ export async function getBookWorkflowDepartmentBySlug(slug: string): Promise<Boo
       categories: enrichedCategories
     }
   } catch (error) {
-    console.error("Error in getBookWorkflowDepartmentBySlug:", error)
+    const logger = createBookWorkflowLogger('getBookWorkflowDepartmentBySlug', {
+      departmentSlug
+    })
+    logger.error('Failed to fetch book workflow department by slug', error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }
@@ -213,12 +226,14 @@ export async function getBookWorkflowCategory(departmentSlug: string, categorySl
           name,
           slug
         ),
-        books (
+        book_workflows!inner (
           id,
-          title,
-          slug,
-          author,
-          book_workflows!inner (id)
+          books (
+            id,
+            title,
+            slug,
+            author
+          )
         )
       `)
       .eq("slug", categorySlug)
@@ -229,14 +244,41 @@ export async function getBookWorkflowCategory(departmentSlug: string, categorySl
       if (error.code === "PGRST116") {
         return null // Category not found
       }
-      console.error("Error fetching book workflow category:", error)
-      throw new Error("Failed to fetch category")
+
+      // Create proper error with Supabase error details
+      const errorMessage = error.message || error.details || `Database error: ${error.code || 'unknown'}`
+      const dbError = new Error(errorMessage)
+
+      logError(
+        "Error fetching book workflow category",
+        dbError,
+        {
+          departmentSlug,
+          categorySlug,
+          operation: 'getBookWorkflowCategory',
+          supabaseError: {
+            code: error.code,
+            message: error.message,
+            details: error.details,
+            hint: error.hint
+          }
+        }
+      )
+      throw dbError
     }
 
-    const bookCount = category.books?.length || 0
-    const workflowCount = category.books?.reduce((total: number, book: any) => {
-      return total + (book.book_workflows?.length || 0)
-    }, 0) || 0
+    // Handle new structure: category -> book_workflows -> books
+    const uniqueBooks = new Set()
+    let workflowCount = 0
+
+    category.book_workflows?.forEach((workflow: any) => {
+      if (workflow.books) {
+        uniqueBooks.add(workflow.books.id)
+      }
+      workflowCount++
+    })
+
+    const bookCount = uniqueBooks.size
 
     return {
       id: category.id,
@@ -251,7 +293,10 @@ export async function getBookWorkflowCategory(departmentSlug: string, categorySl
       workflowCount
     }
   } catch (error) {
-    console.error("Error in getBookWorkflowCategory:", error)
+    const logger = createBookWorkflowLogger('getBookWorkflowCategory', {
+      departmentSlug, categorySlug
+    })
+    logger.error('Failed to fetch book workflow category', error instanceof Error ? error : new Error(String(error)))
     throw error
   }
 }
@@ -286,7 +331,15 @@ export async function getBooksByCategory(departmentSlug: string, categorySlug: s
       .order("title", { ascending: true })
 
     if (error) {
-      console.error("Error fetching books by category:", error)
+      logError(
+        "Error fetching books by category",
+        new Error(`Database error: ${error.message || error}`),
+        {
+          departmentSlug,
+          categorySlug,
+          operation: 'getBooksByCategory'
+        }
+      )
       throw new Error("Failed to fetch books")
     }
 
@@ -311,7 +364,15 @@ export async function getBooksByCategory(departmentSlug: string, categorySlug: s
 
     return Array.from(bookMap.values()).sort((a, b) => a.title.localeCompare(b.title))
   } catch (error) {
-    console.error("Error in getBooksByCategory:", error)
+    logError(
+      "Error in getBooksByCategory",
+      error instanceof Error ? error : new Error(String(error)),
+      {
+        departmentSlug,
+        categorySlug,
+        operation: 'getBooksByCategory'
+      }
+    )
     throw error
   }
 }
@@ -849,7 +910,7 @@ export async function executeBookWorkflowCSVImport(csvData: CSVBookWorkflowRow[]
       imported_by: user.clerkId,
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
-      importerName: user.name,
+      importerName: user.name || undefined,
       duration: 0,
       status: result.stats.errors_count > 0 ? 'completed' : 'completed'
     }

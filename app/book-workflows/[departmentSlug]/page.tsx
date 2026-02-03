@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
 interface PageProps {
-  params: { departmentSlug: string }
+  params: Promise<{ departmentSlug: string }>
 }
 
 function CategoryCard({ category, departmentSlug }: { category: any, departmentSlug: string }) {
@@ -20,24 +20,25 @@ function CategoryCard({ category, departmentSlug }: { category: any, departmentS
             {category.name}
             <div className="text-gray-400">→</div>
           </CardTitle>
-          <CardDescription className="space-y-1">
-            <div className="flex items-center gap-1 text-sm">
+          <div className="text-sm text-muted-foreground space-y-1">
+            <div className="flex items-center gap-1">
               <Book className="h-4 w-4" />
               <span>{category.bookCount} books</span>
             </div>
-            <div className="flex items-center gap-1 text-sm">
+            <div className="flex items-center gap-1">
               <Target className="h-4 w-4" />
               <span>{category.workflowCount} workflows</span>
             </div>
-          </CardDescription>
+          </div>
         </CardHeader>
       </Card>
     </Link>
   )
 }
 
-async function DepartmentPageContent({ params }: { params: { departmentSlug: string } }) {
-  const department = await getBookWorkflowDepartmentBySlug(params.departmentSlug)
+async function DepartmentPageContent({ params }: { params: Promise<{ departmentSlug: string }> }) {
+  const { departmentSlug } = await params
+  const department = await getBookWorkflowDepartmentBySlug(departmentSlug)
 
   if (!department) {
     notFound()
@@ -73,7 +74,7 @@ async function DepartmentPageContent({ params }: { params: { departmentSlug: str
             <CategoryCard
               key={category.id}
               category={category}
-              departmentSlug={params.departmentSlug}
+              departmentSlug={departmentSlug}
             />
           ))}
         </div>

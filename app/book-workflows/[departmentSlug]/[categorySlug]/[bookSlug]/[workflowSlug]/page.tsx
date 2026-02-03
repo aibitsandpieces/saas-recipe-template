@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
 interface PageProps {
-  params: {
+  params: Promise<{
     departmentSlug: string
     categorySlug: string
     bookSlug: string
     workflowSlug: string
-  }
+  }>
 }
 
 function getActivityTypeIcon(activityType: string) {
@@ -82,13 +82,14 @@ function formatDate(dateString: string) {
 async function WorkflowPageContent({
   params
 }: {
-  params: { departmentSlug: string, categorySlug: string, bookSlug: string, workflowSlug: string }
+  params: Promise<{ departmentSlug: string, categorySlug: string, bookSlug: string, workflowSlug: string }>
 }) {
+  const { departmentSlug, categorySlug, bookSlug, workflowSlug } = await params
   const workflow = await getBookWorkflow(
-    params.departmentSlug,
-    params.categorySlug,
-    params.bookSlug,
-    params.workflowSlug
+    departmentSlug,
+    categorySlug,
+    bookSlug,
+    workflowSlug
   )
 
   if (!workflow) {
@@ -102,7 +103,7 @@ async function WorkflowPageContent({
         <Breadcrumb workflow={workflow} />
 
         <div className="flex items-center gap-4 mb-6">
-          <Link href={`/book-workflows/${params.departmentSlug}/${params.categorySlug}/${params.bookSlug}`}>
+          <Link href={`/book-workflows/${departmentSlug}/${categorySlug}/${bookSlug}`}>
             <Button variant="ghost" size="sm" className="flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back to {workflow.bookTitle}

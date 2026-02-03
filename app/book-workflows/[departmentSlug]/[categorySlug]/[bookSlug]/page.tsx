@@ -8,11 +8,11 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
 interface PageProps {
-  params: {
+  params: Promise<{
     departmentSlug: string
     categorySlug: string
     bookSlug: string
-  }
+  }>
 }
 
 function getActivityTypeIcon(activityType: string) {
@@ -99,8 +99,9 @@ function Breadcrumb({ book }: { book: any }) {
   )
 }
 
-async function BookPageContent({ params }: { params: { departmentSlug: string, categorySlug: string, bookSlug: string } }) {
-  const book = await getBookWithWorkflows(params.bookSlug)
+async function BookPageContent({ params }: { params: Promise<{ departmentSlug: string, categorySlug: string, bookSlug: string }> }) {
+  const { departmentSlug, categorySlug, bookSlug } = await params
+  const book = await getBookWithWorkflows(bookSlug)
 
   if (!book) {
     notFound()
@@ -108,8 +109,8 @@ async function BookPageContent({ params }: { params: { departmentSlug: string, c
 
   // Filter workflows by the current category (book might have workflows in multiple categories)
   const categoryWorkflows = book.workflows.filter(workflow =>
-    workflow.categorySlug === params.categorySlug &&
-    workflow.departmentSlug === params.departmentSlug
+    workflow.categorySlug === categorySlug &&
+    workflow.departmentSlug === departmentSlug
   )
 
   if (categoryWorkflows.length === 0) {
@@ -123,7 +124,7 @@ async function BookPageContent({ params }: { params: { departmentSlug: string, c
         <Breadcrumb book={book} />
 
         <div className="flex items-center gap-4 mb-4">
-          <Link href={`/book-workflows/${params.departmentSlug}/${params.categorySlug}`}>
+          <Link href={`/book-workflows/${departmentSlug}/${categorySlug}`}>
             <Button variant="ghost" size="sm" className="flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back to {categoryWorkflows[0]?.categoryName}
@@ -142,7 +143,7 @@ async function BookPageContent({ params }: { params: { departmentSlug: string, c
 
           <div className="flex gap-4 text-sm text-gray-600">
             <span>{categoryWorkflows.length} workflows in this category</span>
-            {book.workflowCount > categoryWorkflows.length && (
+            {book.workflowCount && book.workflowCount > categoryWorkflows.length && (
               <>
                 <span>•</span>
                 <span>{book.workflowCount} total workflows across all categories</span>
@@ -158,9 +159,9 @@ async function BookPageContent({ params }: { params: { departmentSlug: string, c
           <WorkflowCard
             key={workflow.id}
             workflow={workflow}
-            departmentSlug={params.departmentSlug}
-            categorySlug={params.categorySlug}
-            bookSlug={params.bookSlug}
+            departmentSlug={departmentSlug}
+            categorySlug={categorySlug}
+            bookSlug={bookSlug}
           />
         ))}
       </div>
