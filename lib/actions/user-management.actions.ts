@@ -45,7 +45,7 @@ const InviteUserSchema = z.object({
  * Preview user CSV import data and validate before execution
  */
 export async function previewUserImport(csvData: CSVUserRow[]): Promise<UserImportPreviewResult> {
-  const { user } = await requireUserWithOrg()
+  const user = await requirePlatformAdmin()  // CHANGE: Require platform admin for org creation
   const supabase = await createSupabaseClient()
 
   const errors: UserImportError[] = []
@@ -53,10 +53,14 @@ export async function previewUserImport(csvData: CSVUserRow[]): Promise<UserImpo
   const summary = {
     usersToInvite: 0,
     organisationsFound: [] as string[],
+    organisationsToCreate: [] as string[],  // NEW - organizations that will be created
     coursesFound: [] as string[],
     rolesAssigned: {} as { [role: string]: number },
     duplicateEmails: [] as string[]
   }
+
+  // Track organizations to create
+  const organisationsToCreate = new Set<string>()  // NEW
 
   // Track emails to detect duplicates within CSV
   const emailSet = new Set<string>()
@@ -117,12 +121,19 @@ export async function previewUserImport(csvData: CSVUserRow[]): Promise<UserImpo
       errors.push({ row: rowNum, field: 'organisation', message: 'Organisation is required', value: row.organisation })
       rowValid = false
     } else {
-      const org = orgMap.get(row.organisation.toLowerCase().trim())
+      const orgKey = row.organisation.toLowerCase().trim()
+      const org = orgMap.get(orgKey)
+
       if (!org) {
-        errors.push({ row: rowNum, field: 'organisation', message: 'Organisation not found', value: row.organisation })
-        rowValid = false
-      } else if (!summary.organisationsFound.includes(org.name)) {
-        summary.organisationsFound.push(org.name)
+        // NEW: Instead of error, mark for creation
+        if (!organisationsToCreate.has(orgKey)) {
+          organisationsToCreate.add(row.organisation.trim())  // Store original casing
+        }
+      } else {
+        // Existing organization
+        if (!summary.organisationsFound.includes(org.name)) {
+          summary.organisationsFound.push(org.name)
+        }
       }
     }
 
@@ -146,6 +157,9 @@ export async function previewUserImport(csvData: CSVUserRow[]): Promise<UserImpo
     }
   }
 
+  // NEW: Add organizations to create to summary
+  summary.organisationsToCreate = Array.from(organisationsToCreate)
+
   return {
     isValid: errors.length === 0,
     totalRows: csvData.length,
@@ -160,7 +174,7 @@ export async function previewUserImport(csvData: CSVUserRow[]): Promise<UserImpo
  * Execute user CSV import with Clerk invitation creation
  */
 export async function executeUserImport(csvData: CSVUserRow[], fileName: string): Promise<UserImportLog> {
-  const { user, organisationId } = await requireUserWithOrg()
+  const user = await requirePlatformAdmin()  // CHANGE: Platform admin required
   const supabaseAdmin = createSupabaseAdmin()
   const clerk = await clerkClient()
 
@@ -176,6 +190,7 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
     successful_invitations: 0,
     failed_invitations: 0,
     organisations_processed: 0,
+    organisations_created: 0,  // NEW
     individual_enrollments: 0,
     imported_by: user.clerkId,
     started_at: new Date().toISOString(),
@@ -183,7 +198,29 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
   }
 
   try {
-    // Get reference data
+    // NEW: Create missing organizations first
+    const createdOrgs = new Map<string, string>()  // name -> id mapping
+
+    if (preview.summary.organisationsToCreate.length > 0) {
+      for (const orgName of preview.summary.organisationsToCreate) {
+        const { data: newOrg, error: orgError } = await supabaseAdmin
+          .from("organisations")
+          .insert({
+            name: orgName.trim()
+          })
+          .select('id, name')
+          .single()
+
+        if (orgError) {
+          throw new Error(`Failed to create organization '${orgName}': ${orgError.message}`)
+        }
+
+        createdOrgs.set(orgName.toLowerCase().trim(), newOrg.id)
+        importLog.organisations_created++
+      }
+    }
+
+    // Get reference data (now includes newly created ones)
     const { data: organisations } = await supabaseAdmin
       .from("organisations")
       .select("id, name")
@@ -345,10 +382,12 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
     return importLog
 
   } catch (error) {
+    // NEW: Enhanced error handling for organization creation
     importLog.status = 'failed'
     importLog.completed_at = new Date().toISOString()
     importLog.error_summary = {
       message: error instanceof Error ? error.message : 'Unknown error occurred',
+      organisations_created: importLog.organisations_created,
       stack: error instanceof Error ? error.stack : undefined
     }
 
@@ -363,7 +402,7 @@ export async function getUsersForAdmin(filters: UserSearchFilters = {}): Promise
   // Validate input filters
   const validatedFilters = UserSearchFiltersSchema.parse(filters)
 
-  const { user } = await requireOrgAdmin()
+  const user = await requirePlatformAdmin() // Fixed: Platform admin required for cross-org user management
   const supabase = await createSupabaseClient()
 
   const {
@@ -377,17 +416,13 @@ export async function getUsersForAdmin(filters: UserSearchFilters = {}): Promise
 
   const offset = (page - 1) * limit
 
-  // Build user query
+  // Build user query (temporarily removed course enrollments due to relationship ambiguity)
   let userQuery = supabase
     .from("users")
     .select(`
       *,
       user_roles(role:roles(name)),
-      organisation:organisations(name),
-      course_enrollments:course_user_enrollments(
-        id,
-        course:courses(name)
-      )
+      organisation:organisations(name)
     `)
 
   // Apply filters
@@ -438,15 +473,12 @@ export async function getUsersForAdmin(filters: UserSearchFilters = {}): Promise
     throw new Error(`Failed to fetch invitations: ${invitationsError.message}`)
   }
 
-  // Transform users data
+  // Transform users data (course enrollments temporarily disabled due to query complexity)
   const transformedUsers: UserWithRole[] = (users || []).map(user => ({
     ...user,
     role: user.user_roles?.[0]?.role?.name || 'org_member',
     organisationName: user.organisation?.name,
-    courseEnrollments: user.course_enrollments?.map((enrollment: any) => ({
-      ...enrollment,
-      courseName: enrollment.course?.name
-    })) || []
+    courseEnrollments: [] // TODO: Re-add course enrollments with proper relationship handling
   }))
 
   // Transform invitations data
@@ -687,6 +719,17 @@ export async function updateUserRole(userId: string, newRole: 'org_admin' | 'org
         role: newRole
       }
     })
+
+    // NOTE: JWT Token Refresh Issue
+    // After updating Clerk metadata, existing JWT tokens will remain stale until they naturally expire
+    // or are manually refreshed. This can cause authorization issues if the user tries to access
+    // role-protected resources immediately after a role change.
+    //
+    // SOLUTION: The target user should call POST /api/auth/refresh-session to force a token refresh,
+    // or sign out and back in to get a fresh JWT with updated role claims.
+    //
+    // This is a known limitation of JWT-based authentication where server-side metadata changes
+    // don't automatically invalidate client-side tokens.
 
   } catch (error) {
     throw error instanceof Error ? error : new Error('Failed to update user role')

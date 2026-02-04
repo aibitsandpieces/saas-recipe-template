@@ -259,6 +259,7 @@ export interface UserImportPreviewResult {
   summary: {
     usersToInvite: number;
     organisationsFound: string[];
+    organisationsToCreate: string[];  // NEW - organizations that will be created
     coursesFound: string[];
     rolesAssigned: { [role: string]: number };
     duplicateEmails: string[];
@@ -273,6 +274,7 @@ export interface UserImportLog {
   successful_invitations: number;
   failed_invitations: number;
   organisations_processed: number;
+  organisations_created: number;      // NEW - count of orgs created
   individual_enrollments: number;
   error_summary?: any;
   imported_by?: string;
