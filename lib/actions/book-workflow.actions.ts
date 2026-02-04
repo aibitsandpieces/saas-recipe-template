@@ -201,7 +201,7 @@ export async function getBookWorkflowDepartmentBySlug(slug: string): Promise<Boo
     }
   } catch (error) {
     const logger = createBookWorkflowLogger('getBookWorkflowDepartmentBySlug', {
-      departmentSlug
+      departmentSlug: slug
     })
     logger.error('Failed to fetch book workflow department by slug', error instanceof Error ? error : new Error(String(error)))
     throw error
@@ -912,7 +912,7 @@ export async function executeBookWorkflowCSVImport(csvData: CSVBookWorkflowRow[]
       completed_at: new Date().toISOString(),
       importerName: user.name || undefined,
       duration: 0,
-      status: (result.errors && result.errors.length > 0) ? 'completed_with_errors' : 'completed'
+      status: 'completed' as const
     }
 
     // Revalidate relevant paths

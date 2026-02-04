@@ -27,7 +27,8 @@ import {
   ArrowLeft,
   Download,
   RefreshCw,
-  Mail
+  Mail,
+  UserPlus
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
@@ -38,15 +39,15 @@ import Papa from "papaparse"
 export default function UserImportPage() {
   const { user } = useUser()
 
-  // Check for admin role - redirect if not authorized
+  // Check for platform admin role - redirect if not authorized
   useEffect(() => {
-    if (user && user.publicMetadata?.role !== 'org_admin' && user.publicMetadata?.role !== 'platform_admin') {
+    if (user && user.publicMetadata?.role !== 'platform_admin') {
       redirect('/')
     }
   }, [user])
 
   // Show loading while checking auth
-  if (!user || (user.publicMetadata?.role !== 'org_admin' && user.publicMetadata?.role !== 'platform_admin')) {
+  if (!user || user.publicMetadata?.role !== 'platform_admin') {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -138,7 +139,7 @@ export default function UserImportPage() {
     }
   }
 
-  const executeImport = async () => {
+  const handleExecuteImport = async () => {
     if (!file || !csvData.length || !preview?.isValid) return
 
     setIsImporting(true)
@@ -290,7 +291,7 @@ bob.wilson@company.com,Bob Wilson,org_member,Company Inc,"Course 3"`
               <div><strong>role</strong> - Either "org_admin" or "org_member" (required)</div>
             </div>
             <div className="space-y-1">
-              <div><strong>organisation</strong> - Organization name (required, must exist)</div>
+              <div><strong>organisation</strong> - Organization name (required, will be created if missing)</div>
               <div><strong>courses</strong> - Comma-separated course names for individual access (optional)</div>
             </div>
           </div>
@@ -298,7 +299,8 @@ bob.wilson@company.com,Bob Wilson,org_member,Company Inc,"Course 3"`
             <h4 className="font-medium text-blue-900 mb-2">Important Notes:</h4>
             <ul className="text-sm text-blue-700 space-y-1">
               <li>• Users will receive email invitations to join the platform</li>
-              <li>• Organizations must already exist in the system</li>
+              <li>• New organizations will be created automatically if they don't exist</li>
+              <li>• Platform admin role required for creating organizations</li>
               <li>• Course names must match published courses exactly</li>
               <li>• Individual course access supplements organization-level enrollment</li>
             </ul>
@@ -373,19 +375,21 @@ bob.wilson@company.com,Bob Wilson,org_member,Company Inc,"Course 3"`
               </Button>
               {preview && (
                 <Button
-                  onClick={executeImport}
+                  onClick={handleExecuteImport}
                   disabled={!preview.isValid || isImporting}
                   variant={preview.isValid ? "default" : "secondary"}
+                  className="w-full"
                 >
                   {isImporting ? (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Sending Invitations...
+                      Creating {preview.summary.organisationsToCreate.length} organizations and inviting {preview.summary.usersToInvite} users...
                     </>
                   ) : (
                     <>
-                      <Mail className="h-4 w-4 mr-2" />
-                      Execute Import
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      {preview.summary.organisationsToCreate.length > 0 && `Create ${preview.summary.organisationsToCreate.length} Organizations & `}
+                      Invite {preview.summary.usersToInvite} Users
                     </>
                   )}
                 </Button>
@@ -449,6 +453,20 @@ bob.wilson@company.com,Bob Wilson,org_member,Company Inc,"Course 3"`
                     <div className="text-sm text-gray-500">Courses Referenced</div>
                   </div>
                 </div>
+
+{preview.summary.organisationsToCreate.length > 0 && (
+                  <Alert className="border-blue-200 bg-blue-50">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <AlertDescription className="text-blue-800">
+                      <strong>New Organizations:</strong> The following organizations will be created during import:
+                      <ul className="list-disc list-inside mt-1">
+                        {preview.summary.organisationsToCreate.map(org => (
+                          <li key={org}>{org}</li>
+                        ))}
+                      </ul>
+                    </AlertDescription>
+                  </Alert>
+                )}
 
                 {preview.summary.organisationsFound.length > 0 && (
                   <div>
