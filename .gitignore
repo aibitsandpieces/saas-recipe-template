@@ -47,3 +47,14 @@ next-env.d.ts
 supabase/.temp/
 nul
 supabase-mcp/
+
+# CSV data files
+*.csv
+book_csv/
+
+# Python utility scripts (temporary)
+check_csv.py
+transform_csv.py
+
+# Local Claude settings
+.claude/settings.local.json
