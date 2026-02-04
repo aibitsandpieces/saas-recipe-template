@@ -310,3 +310,166 @@ export interface UserSearchResult {
     hasPreviousPage: boolean;
   };
 }
+
+// Book Workflows System Types
+// Completely separate from the main workflow system
+
+export interface BookWorkflowDepartment {
+  id?: string;
+  name: string;
+  slug: string;
+  sort_order?: number;
+  created_at?: string;
+  // Extended properties added by server actions
+  workflowCount?: number;
+  categoryCount?: number;
+}
+
+export interface BookWorkflowCategory {
+  id?: string;
+  department_id: string;
+  name: string;
+  slug: string;
+  sort_order?: number;
+  created_at?: string;
+  // Extended properties added by server actions
+  departmentName?: string;
+  departmentSlug?: string;
+  workflowCount?: number;
+  bookCount?: number;
+}
+
+export interface Book {
+  id?: string;
+  title: string;
+  slug: string;
+  author: string;
+  created_at?: string;
+  // Extended properties added by server actions
+  workflowCount?: number;
+  categories?: BookWorkflowCategory[];
+}
+
+export interface BookWorkflow {
+  id?: string;
+  book_id: string;
+  category_id: string;
+  name: string;
+  slug: string;
+  content?: string;
+  activity_type: 'Create' | 'Assess' | 'Plan' | 'Workshop';
+  problem_goal: 'Grow' | 'Optimise' | 'Lead' | 'Strategise' | 'Innovate' | 'Understand';
+  is_published?: boolean;
+  created_at?: string;
+  updated_at?: string;
+  // Extended properties added by server actions
+  bookTitle?: string;
+  bookSlug?: string;
+  bookAuthor?: string;
+  categoryName?: string;
+  categorySlug?: string;
+  departmentName?: string;
+  departmentSlug?: string;
+}
+
+// CSV Import Types for Book Workflows
+export interface CSVBookWorkflowRow {
+  department: string;     // Maps to department (must exist)
+  category: string;       // Maps to category (find or create)
+  book: string;          // Maps to book title (find or create)
+  author: string;        // Maps to book author
+  workflow: string;      // Maps to workflow name
+  activity_type: 'Create' | 'Assess' | 'Plan' | 'Workshop';
+  problem_goal: 'Grow' | 'Optimise' | 'Lead' | 'Strategise' | 'Innovate' | 'Understand';
+}
+
+export interface BookWorkflowImportError {
+  row: number;
+  field?: string;
+  message: string;
+  value?: any;
+}
+
+export interface BookWorkflowImportPreview {
+  isValid: boolean;
+  totalRows: number;
+  validRows: number;
+  errors: BookWorkflowImportError[];
+  summary: {
+    departmentsFound: string[];
+    categoriesToCreate: string[];
+    booksToCreate: string[];
+    workflowsToCreate: number;
+    existingCategories: string[];
+    existingBooks: string[];
+    activityTypeDistribution: { [key: string]: number };
+    problemGoalDistribution: { [key: string]: number };
+  };
+  sampleData: CSVBookWorkflowRow[];
+}
+
+export interface BookWorkflowImportLog {
+  id?: string;
+  file_name: string;
+  total_rows: number;
+  successful_rows: number;
+  failed_rows: number;
+  categories_created?: number;
+  books_created?: number;
+  workflows_created?: number;
+  error_summary?: any;
+  imported_by?: string;
+  started_at?: string;
+  completed_at?: string;
+  // Extended properties added by server actions
+  importerName?: string;
+  duration?: number;
+  status?: 'pending' | 'completed' | 'failed';
+}
+
+// Book Workflow Search and Filter Types
+export interface BookWorkflowSearchFilters {
+  query?: string;
+  departmentId?: string;
+  categoryId?: string;
+  bookId?: string;
+  activityType?: 'Create' | 'Assess' | 'Plan' | 'Workshop' | '';
+  problemGoal?: 'Grow' | 'Optimise' | 'Lead' | 'Strategise' | 'Innovate' | 'Understand' | '';
+  author?: string;
+  isPublished?: boolean;
+  // Pagination parameters
+  page?: number;
+  limit?: number;
+}
+
+export interface BookWorkflowSearchResult {
+  workflows: BookWorkflow[];
+  totalCount: number;
+  departments: BookWorkflowDepartment[];
+  categories: BookWorkflowCategory[];
+  books: Book[];
+  // Pagination metadata
+  pagination: {
+    page: number;
+    limit: number;
+    totalPages: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+  // Filter distributions for faceted search
+  activityTypeDistribution: { [key: string]: number };
+  problemGoalDistribution: { [key: string]: number };
+}
+
+// Hierarchical Book Workflow Types (for navigation)
+export interface BookWorkflowDepartmentWithCategories extends BookWorkflowDepartment {
+  categories: (BookWorkflowCategory & {
+    books?: (Book & {
+      workflows?: BookWorkflow[];
+    })[];
+  })[];
+}
+
+export interface BookWithWorkflows extends Book {
+  workflows: BookWorkflow[];
+}

@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
-import { BookOpen, Settings, ChevronDown, Users, GraduationCap, Menu, X, Network } from "lucide-react"
+import { BookOpen, Settings, ChevronDown, Users, GraduationCap, Menu, X, Network, Book } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import { useState } from "react"
 
@@ -53,6 +53,14 @@ const Navbar = () => {
               </Link>
             </Button>
 
+            {/* Book Workflows Link */}
+            <Button variant="ghost" asChild>
+              <Link href="/book-workflows" className="flex items-center space-x-2">
+                <Book className="h-4 w-4" />
+                <span>Book Workflows</span>
+              </Link>
+            </Button>
+
             {/* Admin Dropdown - Only for Platform Admins */}
             {isPlatformAdmin && (
               <DropdownMenu>
@@ -74,6 +82,12 @@ const Navbar = () => {
                     <Link href="/admin/workflows" className="flex items-center space-x-2">
                       <Network className="h-4 w-4" />
                       <span>Manage Workflows</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/admin/book-workflows" className="flex items-center space-x-2">
+                      <Book className="h-4 w-4" />
+                      <span>Manage Book Workflows</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
@@ -155,6 +169,18 @@ const Navbar = () => {
                 </Link>
               </Button>
 
+              <Button
+                variant="ghost"
+                className="w-full justify-start"
+                asChild
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Link href="/book-workflows" className="flex items-center space-x-2">
+                  <Book className="h-4 w-4" />
+                  <span>Book Workflows</span>
+                </Link>
+              </Button>
+
               {/* Admin Links for Mobile */}
               {isPlatformAdmin && (
                 <>
@@ -180,6 +206,17 @@ const Navbar = () => {
                       <Link href="/admin/workflows" className="flex items-center space-x-2">
                         <Network className="h-4 w-4" />
                         <span>Manage Workflows</span>
+                      </Link>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start"
+                      asChild
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <Link href="/admin/book-workflows" className="flex items-center space-x-2">
+                        <Book className="h-4 w-4" />
+                        <span>Manage Book Workflows</span>
                       </Link>
                     </Button>
                     <Button
