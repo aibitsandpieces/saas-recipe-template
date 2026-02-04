@@ -85,7 +85,16 @@
       "mcp__plugin_context7_context7__query-docs",
       "Bash(grep:*)",
       "Bash(wc:*)",
-      "Bash(npx shadcn@latest add:*)"
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(cmd.exe /c \"taskkill /PID 25240 /F\")",
+      "Bash(powershell \"Stop-Process -Id 25240 -Force\")",
+      "Bash(powershell \"Stop-Process -Id 4232 -Force\")",
+      "Bash(dir:*)",
+      "Bash(find:*)",
+      "Bash(git show:*)",
+      "Bash(npx next build:*)",
+      "Bash(powershell \"Stop-Process -Name node -Force\")",
+      "Bash(powershell:*)"
     ]
   }
 }
