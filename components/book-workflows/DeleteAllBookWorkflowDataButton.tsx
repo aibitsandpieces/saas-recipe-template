@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useId } from "react"
 import { Trash2, AlertTriangle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label"
 import { deleteAllBookWorkflowData } from "@/lib/actions/book-workflow.actions"
 
 export function DeleteAllBookWorkflowDataButton() {
+  const dialogId = useId()
   const [isOpen, setIsOpen] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
   const [confirmText, setConfirmText] = useState("")
@@ -58,7 +59,7 @@ export function DeleteAllBookWorkflowDataButton() {
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogTrigger asChild>
-        <Button variant="destructive" className="w-full">
+        <Button variant="destructive" className="w-full" suppressHydrationWarning>
           <Trash2 className="h-4 w-4 mr-2" />
           Delete All Book Workflow Data
         </Button>

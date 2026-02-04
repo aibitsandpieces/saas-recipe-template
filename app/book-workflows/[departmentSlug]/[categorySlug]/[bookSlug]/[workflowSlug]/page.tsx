@@ -6,6 +6,7 @@ import { getBookWorkflow } from "@/lib/actions/book-workflow.actions"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { CopyButton } from "@/components/CopyButton"
 
 interface PageProps {
   params: Promise<{
@@ -158,11 +159,18 @@ async function WorkflowPageContent({
       <div className="space-y-6">
         {workflow.content ? (
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
               <CardTitle className="flex items-center gap-2">
                 <Target className="h-5 w-5" />
                 Workflow Content
               </CardTitle>
+              <CopyButton
+                text={workflow.content}
+                ariaLabel="Copy workflow content to clipboard"
+                successMessage="Workflow content copied!"
+                variant="outline"
+                size="sm"
+              />
             </CardHeader>
             <CardContent>
               <div className="prose prose-sm max-w-none">

@@ -901,18 +901,18 @@ export async function executeBookWorkflowCSVImport(csvData: CSVBookWorkflowRow[]
     const importLog: BookWorkflowImportLog = {
       file_name: fileName,
       total_rows: csvData.length,
-      successful_rows: result.stats.created_workflows,
-      failed_rows: result.stats.errors_count,
-      categories_created: result.stats.created_categories,
-      books_created: result.stats.created_books,
-      workflows_created: result.stats.created_workflows,
-      error_summary: result.errors,
+      successful_rows: result.created_workflows || 0,
+      failed_rows: result.errors ? result.errors.length : 0,
+      categories_created: result.created_categories || 0,
+      books_created: result.created_books || 0,
+      workflows_created: result.created_workflows || 0,
+      error_summary: result.errors || null,
       imported_by: user.clerkId,
       started_at: new Date().toISOString(),
       completed_at: new Date().toISOString(),
       importerName: user.name || undefined,
       duration: 0,
-      status: result.stats.errors_count > 0 ? 'completed' : 'completed'
+      status: (result.errors && result.errors.length > 0) ? 'completed_with_errors' : 'completed'
     }
 
     // Revalidate relevant paths
