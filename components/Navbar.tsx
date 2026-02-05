@@ -28,12 +28,12 @@ const Navbar = () => {
   const isOrgAdmin = userRole === 'org_admin'
 
   return (
-    <header className="border-b border-border bg-background">
+    <header className="border-b bg-sage-deep">
       <div className="flex justify-between items-center p-4 gap-4 h-16 max-w-7xl mx-auto">
         {/* Logo - Unbranded "Portal" */}
         <Link
           href="/dashboard"
-          className="text-xl sm:text-2xl font-bold text-foreground hover:text-primary transition-colors"
+          className="text-xl sm:text-2xl font-bold text-warm-white hover:text-amber transition-colors"
         >
           Portal
         </Link>
@@ -67,7 +67,7 @@ const Navbar = () => {
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" className="flex items-center space-x-2">
+                  <Button variant="ghost" className="flex items-center space-x-2 text-warm-white hover:text-amber">
                     <span>Admin</span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
@@ -148,12 +148,12 @@ const Navbar = () => {
       {/* Mobile Navigation Menu */}
       <SignedIn>
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-border bg-card">
+          <div className="md:hidden border-t border-sage bg-sage-deep">
             <nav className="p-4 space-y-2">
               {/* Main Navigation Links */}
               <Button
                 variant="ghost"
-                className="w-full justify-start"
+                className="w-full justify-start text-warm-white hover:text-amber"
                 asChild
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -162,7 +162,7 @@ const Navbar = () => {
 
               <Button
                 variant="ghost"
-                className="w-full justify-start"
+                className="w-full justify-start text-warm-white hover:text-amber"
                 asChild
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -171,7 +171,7 @@ const Navbar = () => {
 
               <Button
                 variant="ghost"
-                className="w-full justify-start"
+                className="w-full justify-start text-warm-white hover:text-amber"
                 asChild
                 onClick={() => setMobileMenuOpen(false)}
               >
@@ -180,15 +180,15 @@ const Navbar = () => {
 
               {/* Admin Section for Mobile */}
               {isAdmin && (
-                <div className="border-t border-border my-2 pt-2">
-                  <p className="text-xs text-muted-foreground mb-2 px-3">Admin</p>
+                <div className="border-t border-sage my-2 pt-2">
+                  <p className="text-xs text-warm-white mb-2 px-3">Admin</p>
 
                   {/* Platform Admin - Gets all 6 items */}
                   {isPlatformAdmin && (
                     <>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="w-full justify-start text-warm-white hover:text-amber"
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
@@ -196,7 +196,7 @@ const Navbar = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="w-full justify-start text-warm-white hover:text-amber"
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
@@ -204,7 +204,7 @@ const Navbar = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="w-full justify-start text-warm-white hover:text-amber"
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
@@ -212,7 +212,7 @@ const Navbar = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="w-full justify-start text-warm-white hover:text-amber"
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
@@ -220,7 +220,7 @@ const Navbar = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="w-full justify-start text-warm-white hover:text-amber"
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
@@ -228,7 +228,7 @@ const Navbar = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="w-full justify-start text-warm-white hover:text-amber"
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
@@ -242,7 +242,7 @@ const Navbar = () => {
                     <>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="w-full justify-start text-warm-white hover:text-amber"
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
@@ -250,7 +250,7 @@ const Navbar = () => {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="w-full justify-start text-warm-white hover:text-amber"
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >

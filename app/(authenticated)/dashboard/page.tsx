@@ -8,6 +8,25 @@ export default async function DashboardPage() {
   const user = await getCurrentUser()
   await logAuthState('Dashboard', user)
 
+  // Add null user handling
+  if (!user) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
+          <h2 className="text-lg font-semibold text-amber-800">Authentication Issue</h2>
+          <p className="text-amber-700 mt-2">
+            Unable to load user profile. This may be due to a temporary sync issue.
+          </p>
+          <div className="mt-4 space-y-2 text-sm text-amber-600">
+            <p>• Check browser console for detailed error information</p>
+            <p>• Try signing out and signing back in</p>
+            <p>• Contact support if the issue persists</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const userIsPlatformAdmin = isPlatformAdmin(user)
   const userIsAdmin = isAdmin(user)
 

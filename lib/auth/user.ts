@@ -54,14 +54,24 @@ export async function getCurrentUser(): Promise<UserContext | null> {
     .single();
 
   if (userError || !userData) {
-    console.error("Error fetching user:", {
+    // Enhanced diagnostic logging
+    console.error("Error fetching user - DETAILED:", {
       error: userError,
       userId,
-      message: userError?.message,
-      details: userError?.details,
-      hint: userError?.hint,
-      code: userError?.code
+      errorCode: userError?.code,
+      errorMessage: userError?.message,
+      errorDetails: userError?.details,
+      errorHint: userError?.hint,
+      dataReturned: userData,
+      timestamp: new Date().toISOString()
     });
+
+    // Add specific error type detection
+    if (userError?.code === 'PGRST116') {
+      console.warn('User sync issue detected: User exists in Clerk but not in Supabase database');
+      console.warn('This is a known issue in localhost development - check CLAUDE.md for details');
+    }
+
     return null;
   }
 

@@ -10,8 +10,8 @@ export const useActiveNavigation = () => {
 
   const getLinkStyles = (href: string, baseClass: string = "") => {
     return `${baseClass} ${isActive(href)
-      ? "font-semibold text-foreground"
-      : "text-muted-foreground hover:text-foreground"}`
+      ? "font-semibold text-amber"
+      : "text-warm-white hover:text-amber"}`
   }
 
   return { isActive, getLinkStyles }

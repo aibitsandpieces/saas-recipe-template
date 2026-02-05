@@ -81,7 +81,21 @@ export async function POST(req: NextRequest) {
  * and assigns appropriate role and individual course enrollments
  */
 async function handleUserCreated(clerkUser: any, supabase: any) {
-  console.log("Creating user:", clerkUser.id);
+  console.log('Processing user.created webhook:', {
+    userId: clerkUser.id,
+    email: clerkUser.email_addresses?.[0]?.email_address,
+    firstName: clerkUser.first_name,
+    lastName: clerkUser.last_name
+  });
+
+  // Enhanced validation
+  if (!clerkUser.first_name || !clerkUser.last_name) {
+    console.warn('User created without required name fields:', {
+      userId: clerkUser.id,
+      firstName: clerkUser.first_name,
+      lastName: clerkUser.last_name
+    });
+  }
 
   const email = clerkUser.email_addresses[0]?.email_address?.toLowerCase();
 
@@ -273,7 +287,11 @@ async function handleUserCreated(clerkUser: any, supabase: any) {
 
     console.log(`Successfully created user ${email} with role ${userRole}`);
   } catch (error) {
-    console.error("Error in handleUserCreated:", error);
+    console.error('Failed to process user.created webhook:', {
+      error,
+      userId: clerkUser.id,
+      errorMessage: error instanceof Error ? error.message : 'Unknown error'
+    });
     throw error;
   }
 }

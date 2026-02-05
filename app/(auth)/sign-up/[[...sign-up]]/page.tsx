@@ -29,24 +29,6 @@ const SignUpPage = async ({ searchParams }: SignUpPageProps) => {
             formButtonPrimary: "bg-blue-600 hover:bg-blue-700",
           },
         }}
-        additionalSignUpFields={[
-          {
-            name: "first_name",
-            label: "First Name",
-            required: true,
-            attributes: {
-              placeholder: "Enter your first name",
-            },
-          },
-          {
-            name: "last_name",
-            label: "Last Name",
-            required: true,
-            attributes: {
-              placeholder: "Enter your last name",
-            },
-          },
-        ]}
         afterSignUpUrl="/dashboard"
       />
     </main>
