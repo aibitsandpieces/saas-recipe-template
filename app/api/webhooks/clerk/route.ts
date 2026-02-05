@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { createSupabaseAdmin } from "@/lib/supabase-admin";
 import { clerkClient } from "@clerk/nextjs/server";
+import { toTitleCase } from "@/lib/utils";
 
 /**
  * Webhook endpoint for handling Clerk user lifecycle events.
@@ -83,7 +84,16 @@ async function handleUserCreated(clerkUser: any, supabase: any) {
   console.log("Creating user:", clerkUser.id);
 
   const email = clerkUser.email_addresses[0]?.email_address?.toLowerCase();
-  const name = `${clerkUser.first_name || ""} ${clerkUser.last_name || ""}`.trim() || null;
+
+  // Extract and format names from Clerk
+  const rawFirstName = clerkUser.first_name?.trim() || "";
+  const rawLastName = clerkUser.last_name?.trim() || "";
+
+  const first_name = rawFirstName ? toTitleCase(rawFirstName) : null;
+  const last_name = rawLastName ? toTitleCase(rawLastName) : null;
+
+  // Maintain backward compatibility with single name field
+  const name = [first_name, last_name].filter(Boolean).join(' ') || null;
 
   if (!email) {
     throw new Error("No email address found for user");
@@ -103,6 +113,17 @@ async function handleUserCreated(clerkUser: any, supabase: any) {
       throw invitationError;
     }
 
+    // Fallback logic: if Clerk has no first_name, use invitation name
+    let finalFirstName = first_name;
+    let finalLastName = last_name;
+    let finalName = name;
+
+    if (!first_name && invitation?.name) {
+      finalFirstName = toTitleCase(invitation.name);
+      finalLastName = null; // Don't guess where to split
+      finalName = finalFirstName;
+    }
+
     let orgId = clerkUser.public_metadata?.organisation_id;
     let userRole = "org_member";
 
@@ -120,9 +141,11 @@ async function handleUserCreated(clerkUser: any, supabase: any) {
       const { data, error } = await supabase.rpc('create_user_with_role_and_enrollments', {
         p_clerk_id: clerkUser.id,
         p_email: email,
-        p_name: name,
+        p_name: finalName,
         p_organisation_id: orgId,
         p_role_name: userRole,
+        p_first_name: finalFirstName,
+        p_last_name: finalLastName,
         p_invitation_id: invitation?.id || null,
         p_course_ids: invitation?.courses || []
       });
@@ -144,7 +167,9 @@ async function handleUserCreated(clerkUser: any, supabase: any) {
         .insert({
           clerk_id: clerkUser.id,
           email: email,
-          name: name,
+          name: finalName,
+          first_name: finalFirstName,
+          last_name: finalLastName,
           organisation_id: orgId || null
         })
         .select("id")
@@ -261,7 +286,14 @@ async function handleUserUpdated(clerkUser: any, supabase: any) {
   console.log("Updating user:", clerkUser.id);
 
   const email = clerkUser.email_addresses[0]?.email_address;
-  const name = `${clerkUser.first_name || ""} ${clerkUser.last_name || ""}`.trim() || null;
+
+  // Extract and format names from Clerk
+  const rawFirstName = clerkUser.first_name?.trim() || "";
+  const rawLastName = clerkUser.last_name?.trim() || "";
+
+  const first_name = rawFirstName ? toTitleCase(rawFirstName) : null;
+  const last_name = rawLastName ? toTitleCase(rawLastName) : null;
+  const name = [first_name, last_name].filter(Boolean).join(' ') || null;
 
   try {
     // Update user record in Supabase
@@ -270,6 +302,9 @@ async function handleUserUpdated(clerkUser: any, supabase: any) {
       .update({
         email: email,
         name: name,
+        first_name: first_name,
+        last_name: last_name,
+        updated_at: new Date().toISOString()
       })
       .eq("clerk_id", clerkUser.id);
 

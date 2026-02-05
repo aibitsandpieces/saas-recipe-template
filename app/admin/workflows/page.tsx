@@ -1,5 +1,6 @@
 import { getWorkflowCategoriesWithDepartments, searchWorkflows } from "@/lib/actions/workflow.actions"
 import { getImportLogs } from "@/lib/actions/csv-import.actions"
+import { requirePlatformAdmin } from "@/lib/auth/user"
 import { WorkflowActionsDropdown } from "@/components/admin/WorkflowActionsDropdown"
 import { WorkflowBulkActions } from "@/components/admin/WorkflowBulkActions"
 import { Button } from "@/components/ui/button"
@@ -27,6 +28,8 @@ import {
 import Link from "next/link"
 
 export default async function WorkflowsAdminPage() {
+  // Only platform admins can access workflows
+  await requirePlatformAdmin()
   // Fetch all data needed for the dashboard
   const [categoriesWithDepartments, allWorkflows, recentImportLogs] = await Promise.all([
     getWorkflowCategoriesWithDepartments(),

@@ -1,4 +1,5 @@
 import { getOrganizationsWithStats } from "@/lib/actions/organization.actions"
+import { requirePlatformAdmin } from "@/lib/auth/user"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -15,6 +16,8 @@ import { CreateOrganizationDialog } from "@/components/admin/CreateOrganizationD
 import { OrganizationActionsDropdown } from "@/components/admin/OrganizationActionsDropdown"
 
 export default async function OrganizationsPage() {
+  // Only platform admins can access organizations
+  await requirePlatformAdmin()
   const organizations = await getOrganizationsWithStats()
 
   return (

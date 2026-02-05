@@ -331,7 +331,12 @@ export function UserManagementClient({ user, initialData }: UserManagementClient
                       <TableRow key={user.id}>
                         <TableCell>
                           <div>
-                            <div className="font-medium">{user.name || 'No name'}</div>
+                            <div className="font-medium">
+                              {user.first_name && user.last_name
+                                ? `${user.first_name} ${user.last_name}`
+                                : user.name || 'No name'
+                              }
+                            </div>
                             <div className="text-sm text-gray-500">{user.email}</div>
                           </div>
                         </TableCell>

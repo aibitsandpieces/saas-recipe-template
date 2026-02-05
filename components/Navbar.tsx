@@ -1,10 +1,11 @@
 "use client"
 
 import { SignedOut, SignInButton, SignedIn, UserButton } from "@clerk/nextjs"
+import { useUser } from "@clerk/nextjs"
+import { usePathname } from "next/navigation"
 import Link from "next/link"
-import React from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,126 +13,103 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu"
-import { BookOpen, Settings, ChevronDown, Users, GraduationCap, Menu, X, Network, Book, UserCheck, BarChart3 } from "lucide-react"
-import { useUser } from "@clerk/nextjs"
-import { useState } from "react"
+import { Menu, X, ChevronDown } from "lucide-react"
+import { useActiveNavigation } from "@/lib/hooks/useActiveNavigation"
 
 const Navbar = () => {
   const { user, isLoaded } = useUser()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { getLinkStyles } = useActiveNavigation()
 
   // Check user roles for admin access
   const userRole = user?.publicMetadata?.role
   const isAdmin = userRole === 'platform_admin' || userRole === 'org_admin'
   const isPlatformAdmin = userRole === 'platform_admin'
+  const isOrgAdmin = userRole === 'org_admin'
 
   return (
     <header className="border-b border-border bg-background">
       <div className="flex justify-between items-center p-4 gap-4 h-16 max-w-7xl mx-auto">
-        {/* Logo */}
+        {/* Logo - Unbranded "Portal" */}
         <Link
-          href="/"
+          href="/dashboard"
           className="text-xl sm:text-2xl font-bold text-foreground hover:text-primary transition-colors"
         >
-          AI Potential Portal
+          Portal
         </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-6">
           <SignedIn>
-            {/* Courses Link */}
-            <Button variant="ghost" asChild>
-              <Link href="/courses" className="flex items-center space-x-2">
-                <BookOpen className="h-4 w-4" />
-                <span>Courses</span>
-              </Link>
-            </Button>
+            {/* Main Navigation Links */}
+            <Link
+              href="/courses"
+              className={getLinkStyles("/courses", "transition-colors")}
+            >
+              Courses
+            </Link>
 
-            {/* Workflows Link */}
-            <Button variant="ghost" asChild>
-              <Link href="/workflows" className="flex items-center space-x-2">
-                <Network className="h-4 w-4" />
-                <span>Workflows</span>
-              </Link>
-            </Button>
+            <Link
+              href="/workflows"
+              className={getLinkStyles("/workflows", "transition-colors")}
+            >
+              Workflows
+            </Link>
 
-            {/* Book Workflows Link */}
-            <Button variant="ghost" asChild>
-              <Link href="/book-workflows" className="flex items-center space-x-2">
-                <Book className="h-4 w-4" />
-                <span>Book Workflows</span>
-              </Link>
-            </Button>
+            <Link
+              href="/book-workflows"
+              className={getLinkStyles("/book-workflows", "transition-colors")}
+            >
+              Book Workflows
+            </Link>
 
-            {/* Admin Dropdown - For Both Admin Roles */}
+            {/* Role-based Admin Dropdown */}
             {isAdmin && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center space-x-2">
-                    <Settings className="h-4 w-4" />
                     <span>Admin</span>
                     <ChevronDown className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
-                  {/* Core admin items available to all admin roles */}
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/courses" className="flex items-center space-x-2">
-                      <GraduationCap className="h-4 w-4" />
-                      <span>Manage Courses</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/workflows" className="flex items-center space-x-2">
-                      <Network className="h-4 w-4" />
-                      <span>Manage Workflows</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/book-workflows" className="flex items-center space-x-2">
-                      <Book className="h-4 w-4" />
-                      <span>Manage Book Workflows</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/admin/users" className="flex items-center space-x-2">
-                      <UserCheck className="h-4 w-4" />
-                      <span>Manage Users</span>
-                    </Link>
-                  </DropdownMenuItem>
-
-                  {/* Platform admin exclusive items */}
+                  {/* Platform Admin - Gets all 6 items */}
                   {isPlatformAdmin && (
                     <>
-                      <DropdownMenuSeparator />
                       <DropdownMenuItem asChild>
-                        <Link href="/admin/organizations" className="flex items-center space-x-2">
-                          <Users className="h-4 w-4" />
-                          <span>Manage Organizations</span>
-                        </Link>
+                        <Link href="/admin/courses">Courses</Link>
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
-                        <Link href="/admin/reports" className="flex items-center space-x-2">
-                          <BarChart3 className="h-4 w-4" />
-                          <span>Reports</span>
-                        </Link>
+                        <Link href="/admin/workflows">Workflows</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin/book-workflows">Book Workflows</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin/users">Users</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin/organizations">Organisations</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin/reports">Reports</Link>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+
+                  {/* Org Admin - Gets only 2 items */}
+                  {isOrgAdmin && !isPlatformAdmin && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin/users">Users</Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin/reports">Reports</Link>
                       </DropdownMenuItem>
                     </>
                   )}
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
-
-            {/* Admin Role Badge */}
-            {isPlatformAdmin && (
-              <Badge variant="secondary" className="text-xs">
-                Platform Admin
-              </Badge>
-            )}
-            {userRole === 'org_admin' && (
-              <Badge variant="outline" className="text-xs">
-                Org Admin
-              </Badge>
             )}
           </SignedIn>
         </nav>
@@ -157,7 +135,7 @@ const Navbar = () => {
 
           {/* Auth Buttons */}
           <SignedOut>
-            <SignInButton>
+            <SignInButton mode="modal">
               <Button>Sign In</Button>
             </SignInButton>
           </SignedOut>
@@ -172,16 +150,14 @@ const Navbar = () => {
         {mobileMenuOpen && (
           <div className="md:hidden border-t border-border bg-card">
             <nav className="p-4 space-y-2">
+              {/* Main Navigation Links */}
               <Button
                 variant="ghost"
                 className="w-full justify-start"
                 asChild
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <Link href="/courses" className="flex items-center space-x-2">
-                  <BookOpen className="h-4 w-4" />
-                  <span>Courses</span>
-                </Link>
+                <Link href="/courses">Courses</Link>
               </Button>
 
               <Button
@@ -190,10 +166,7 @@ const Navbar = () => {
                 asChild
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <Link href="/workflows" className="flex items-center space-x-2">
-                  <Network className="h-4 w-4" />
-                  <span>Workflows</span>
-                </Link>
+                <Link href="/workflows">Workflows</Link>
               </Button>
 
               <Button
@@ -202,64 +175,15 @@ const Navbar = () => {
                 asChild
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <Link href="/book-workflows" className="flex items-center space-x-2">
-                  <Book className="h-4 w-4" />
-                  <span>Book Workflows</span>
-                </Link>
+                <Link href="/book-workflows">Book Workflows</Link>
               </Button>
 
-              {/* Admin Links for Mobile */}
+              {/* Admin Section for Mobile */}
               {isAdmin && (
                 <div className="border-t border-border my-2 pt-2">
                   <p className="text-xs text-muted-foreground mb-2 px-3">Admin</p>
 
-                  {/* Core admin items available to all admin roles */}
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    asChild
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Link href="/admin/courses" className="flex items-center space-x-2">
-                      <GraduationCap className="h-4 w-4" />
-                      <span>Manage Courses</span>
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    asChild
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Link href="/admin/workflows" className="flex items-center space-x-2">
-                      <Network className="h-4 w-4" />
-                      <span>Manage Workflows</span>
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    asChild
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Link href="/admin/book-workflows" className="flex items-center space-x-2">
-                      <Book className="h-4 w-4" />
-                      <span>Manage Book Workflows</span>
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="w-full justify-start"
-                    asChild
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    <Link href="/admin/users" className="flex items-center space-x-2">
-                      <UserCheck className="h-4 w-4" />
-                      <span>Manage Users</span>
-                    </Link>
-                  </Button>
-
-                  {/* Platform admin exclusive items */}
+                  {/* Platform Admin - Gets all 6 items */}
                   {isPlatformAdmin && (
                     <>
                       <Button
@@ -268,10 +192,7 @@ const Navbar = () => {
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        <Link href="/admin/organizations" className="flex items-center space-x-2">
-                          <Users className="h-4 w-4" />
-                          <span>Manage Organizations</span>
-                        </Link>
+                        <Link href="/admin/courses">Courses</Link>
                       </Button>
                       <Button
                         variant="ghost"
@@ -279,10 +200,61 @@ const Navbar = () => {
                         asChild
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        <Link href="/admin/reports" className="flex items-center space-x-2">
-                          <BarChart3 className="h-4 w-4" />
-                          <span>Reports</span>
-                        </Link>
+                        <Link href="/admin/workflows">Workflows</Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        asChild
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link href="/admin/book-workflows">Book Workflows</Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        asChild
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link href="/admin/users">Users</Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        asChild
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link href="/admin/organizations">Organisations</Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        asChild
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link href="/admin/reports">Reports</Link>
+                      </Button>
+                    </>
+                  )}
+
+                  {/* Org Admin - Gets only 2 items */}
+                  {isOrgAdmin && !isPlatformAdmin && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        asChild
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link href="/admin/users">Users</Link>
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="w-full justify-start"
+                        asChild
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <Link href="/admin/reports">Reports</Link>
                       </Button>
                     </>
                   )}

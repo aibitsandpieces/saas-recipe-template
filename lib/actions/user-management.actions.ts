@@ -5,6 +5,7 @@ import { createSupabaseAdmin } from "@/lib/supabase-admin"
 import { requireUserWithOrg, requirePlatformAdmin, requireOrgAdmin } from "@/lib/auth/user"
 import { clerkClient } from "@clerk/nextjs/server"
 import { z } from "zod"
+import { toTitleCase } from "@/lib/utils"
 import {
   CSVUserRow,
   UserImportPreviewResult,
@@ -14,7 +15,8 @@ import {
   UserSearchFilters,
   UserSearchResult,
   CourseUserEnrollment,
-  UserImportLog
+  UserImportLog,
+  CreateUserInvitation
 } from "@/types"
 
 // Validation schemas
@@ -36,6 +38,7 @@ const UserSearchFiltersSchema = z.object({
 
 const InviteUserSchema = z.object({
   email: z.string().email("Invalid email format"),
+  name: z.string().optional(),
   organisationId: z.string().uuid("Invalid organisation ID format"),
   role: UserRoleSchema,
   courseIds: z.array(z.string().uuid("Invalid course ID format")).optional()
@@ -53,14 +56,11 @@ export async function previewUserImport(csvData: CSVUserRow[]): Promise<UserImpo
   const summary = {
     usersToInvite: 0,
     organisationsFound: [] as string[],
-    organisationsToCreate: [] as string[],  // NEW - organizations that will be created
     coursesFound: [] as string[],
     rolesAssigned: {} as { [role: string]: number },
     duplicateEmails: [] as string[]
   }
 
-  // Track organizations to create
-  const organisationsToCreate = new Set<string>()  // NEW
 
   // Track emails to detect duplicates within CSV
   const emailSet = new Set<string>()
@@ -125,10 +125,13 @@ export async function previewUserImport(csvData: CSVUserRow[]): Promise<UserImpo
       const org = orgMap.get(orgKey)
 
       if (!org) {
-        // NEW: Instead of error, mark for creation
-        if (!organisationsToCreate.has(orgKey)) {
-          organisationsToCreate.add(row.organisation.trim())  // Store original casing
-        }
+        errors.push({
+          row: rowNum,
+          field: 'organisation',
+          message: `Organisation not found: ${row.organisation}. Please use exact organisation name.`,
+          value: row.organisation
+        })
+        rowValid = false
       } else {
         // Existing organization
         if (!summary.organisationsFound.includes(org.name)) {
@@ -157,8 +160,6 @@ export async function previewUserImport(csvData: CSVUserRow[]): Promise<UserImpo
     }
   }
 
-  // NEW: Add organizations to create to summary
-  summary.organisationsToCreate = Array.from(organisationsToCreate)
 
   return {
     isValid: errors.length === 0,
@@ -195,34 +196,13 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
     successful_invitations: 0,
     failed_invitations: 0,
     organisations_processed: 0,
-    organisations_created: 0,  // NEW
     individual_enrollments: 0,
     imported_by: user.id, // Fixed: Use user.id (UUID) instead of user.clerkId (string)
-    started_at: new Date().toISOString()
+    started_at: new Date().toISOString(),
+    existing_invitations_cleaned: 0 // NEW: Track cleaned up duplicates
   }
 
   try {
-    // NEW: Create missing organizations first
-    const createdOrgs = new Map<string, string>()  // name -> id mapping
-
-    if (preview.summary.organisationsToCreate.length > 0) {
-      for (const orgName of preview.summary.organisationsToCreate) {
-        const { data: newOrg, error: orgError } = await supabaseAdmin
-          .from("organisations")
-          .insert({
-            name: orgName.trim()
-          })
-          .select('id, name')
-          .single()
-
-        if (orgError) {
-          throw new Error(`Failed to create organization '${orgName}': ${orgError.message}`)
-        }
-
-        createdOrgs.set(orgName.toLowerCase().trim(), newOrg.id)
-        importLog.organisations_created++
-      }
-    }
 
     // Get reference data (now includes newly created ones)
     const { data: organisations } = await supabaseAdmin
@@ -248,6 +228,7 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
 
     const createdInvitations: { clerkId: string, supabaseId?: string }[] = []
     const failedInvitations: { email: string, error: string }[] = []
+    let existingInvitationsCleanedCount = 0
 
     try {
       for (const batch of batches) {
@@ -293,6 +274,7 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
                   try {
                     await clerk.invitations.revokeInvitation(existingInvitation.id)
                     console.log(`Revoked existing invitation ${existingInvitation.id} for ${email}`)
+                    existingInvitationsCleanedCount++
                   } catch (revokeError) {
                     console.error(`Failed to revoke invitation ${existingInvitation.id} for ${email}:`, revokeError)
                     // Continue anyway - might be already revoked
@@ -301,6 +283,25 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
               }
             } catch (checkError: any) {
               console.error(`Failed to check existing invitations for ${email}:`, checkError)
+              // Continue anyway - this is not critical for the flow
+            }
+
+            // Clean up existing Supabase invitation records
+            try {
+              const { error: deleteError } = await supabaseAdmin
+                .from("user_invitations")
+                .delete()
+                .eq("email", email)
+                .eq("organisation_id", org.id)
+
+              if (deleteError) {
+                console.warn(`Warning: Failed to delete existing Supabase invitation for ${email}:`, deleteError)
+                // Continue anyway - might not exist
+              } else {
+                console.log(`Cleaned up existing Supabase invitation records for ${email}`)
+              }
+            } catch (supabaseCleanupError) {
+              console.warn(`Warning: Failed to cleanup Supabase invitations for ${email}:`, supabaseCleanupError)
               // Continue anyway - this is not critical for the flow
             }
 
@@ -350,6 +351,7 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
                 .from("user_invitations")
                 .insert({
                   email: email,
+                  name: toTitleCase(row.name), // NEW: Store formatted name from CSV
                   organisation_id: org.id,
                   role_name: row.role,
                   status: 'pending',
@@ -381,9 +383,12 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
             } catch (supabaseError) {
               // Ensure cleanup of Clerk invitation
               try {
-                await clerk.invitations.revokeInvitation(clerkInvitation.id)
+                if (clerkInvitation && clerkInvitation.id) {
+                  await clerk.invitations.revokeInvitation(clerkInvitation.id)
+                }
               } catch (revokeError) {
-                console.error(`Failed to revoke Clerk invitation for ${email}:`, revokeError)
+                // Log but don't throw - cleanup failures shouldn't block the main error
+                console.warn(`Warning: Failed to revoke Clerk invitation during cleanup for ${email}:`, revokeError)
               }
               throw supabaseError
             }
@@ -438,6 +443,7 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
 
     importLog.organisations_processed = processedOrgs.size
     importLog.individual_enrollments = totalIndividualEnrollments
+    importLog.existing_invitations_cleaned = existingInvitationsCleanedCount
     importLog.completed_at = new Date().toISOString()
 
     // Save import log
@@ -470,7 +476,6 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
     importLog.completed_at = new Date().toISOString()
     importLog.error_summary = {
       message: error instanceof Error ? error.message : 'Unknown error occurred',
-      organisations_created: importLog.organisations_created,
       stack: error instanceof Error ? error.stack : undefined
     }
 
@@ -515,7 +520,7 @@ export async function getUsersForAdmin(filters: UserSearchFilters = {}): Promise
       *,
       user_roles(role:roles(name)),
       organisation:organisations(name)
-    `)
+    `, { count: 'exact' })
 
   // Apply filters
   if (organisationId) {
@@ -526,7 +531,7 @@ export async function getUsersForAdmin(filters: UserSearchFilters = {}): Promise
     userQuery = userQuery.or(`name.ilike.%${query}%,email.ilike.%${query}%`)
   }
 
-  // Get users
+  // Get users with count
   const { data: users, error: usersError, count: userCount } = await userQuery
     .range(offset, offset + limit - 1)
     .order('created_at', { ascending: false })
@@ -542,7 +547,7 @@ export async function getUsersForAdmin(filters: UserSearchFilters = {}): Promise
       *,
       inviter:users!invited_by(name),
       organisation:organisations(name)
-    `)
+    `, { count: 'exact' })
 
   if (organisationId) {
     invitationQuery = invitationQuery.eq('organisation_id', organisationId)
@@ -556,7 +561,7 @@ export async function getUsersForAdmin(filters: UserSearchFilters = {}): Promise
     invitationQuery = invitationQuery.eq('status', invitationStatus)
   }
 
-  // Get invitations
+  // Get invitations with count
   const { data: invitations, error: invitationsError, count: invitationCount } = await invitationQuery
     .range(offset, offset + limit - 1)
     .order('invited_at', { ascending: false })
@@ -600,16 +605,11 @@ export async function getUsersForAdmin(filters: UserSearchFilters = {}): Promise
 /**
  * Invite a single user
  */
-export async function inviteUser(invitation: {
-  email: string
-  name: string
-  role: 'org_admin' | 'org_member'
-  organisationId: string
-  courseIds?: string[]
-}): Promise<UserInvitation> {
+export async function inviteUser(invitation: CreateUserInvitation): Promise<UserInvitation> {
   // Validate input using Zod schema
   const validatedInvitation = InviteUserSchema.parse({
     email: invitation.email,
+    name: invitation.name,
     organisationId: invitation.organisationId,
     role: invitation.role,
     courseIds: invitation.courseIds
@@ -677,6 +677,25 @@ export async function inviteUser(invitation: {
       // Continue anyway - this is not critical for the flow
     }
 
+    // Clean up existing Supabase invitation records
+    try {
+      const { error: deleteError } = await supabaseAdmin
+        .from("user_invitations")
+        .delete()
+        .eq("email", invitation.email.toLowerCase())
+        .eq("organisation_id", invitation.organisationId)
+
+      if (deleteError) {
+        console.warn(`Warning: Failed to delete existing Supabase invitation for ${invitation.email}:`, deleteError)
+        // Continue anyway - might not exist
+      } else {
+        console.log(`Cleaned up existing Supabase invitation records for ${invitation.email}`)
+      }
+    } catch (supabaseCleanupError) {
+      console.warn(`Warning: Failed to cleanup Supabase invitations for ${invitation.email}:`, supabaseCleanupError)
+      // Continue anyway - this is not critical for the flow
+    }
+
     // Create Clerk invitation
     let clerkInvitation
     try {
@@ -722,6 +741,7 @@ export async function inviteUser(invitation: {
       .from("user_invitations")
       .insert({
         email: invitation.email.toLowerCase(),
+        name: invitation.name ? toTitleCase(invitation.name) : null, // NEW
         organisation_id: invitation.organisationId,
         role_name: invitation.role,
         status: 'pending',
@@ -736,9 +756,12 @@ export async function inviteUser(invitation: {
     if (error) {
       // Try to revoke Clerk invitation if Supabase insert failed
       try {
-        await clerk.invitations.revokeInvitation(clerkInvitation.id)
+        if (clerkInvitation && clerkInvitation.id) {
+          await clerk.invitations.revokeInvitation(clerkInvitation.id)
+        }
       } catch (revokeError) {
-        console.error('Failed to revoke Clerk invitation:', revokeError)
+        // Log but don't throw - cleanup failures shouldn't block the main error
+        console.warn(`Warning: Failed to revoke Clerk invitation during cleanup for ${invitation.email}:`, revokeError)
       }
       throw new Error(`Failed to create invitation: ${error.message}`)
     }

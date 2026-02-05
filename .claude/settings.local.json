@@ -94,7 +94,11 @@
       "Bash(git show:*)",
       "Bash(npx next build:*)",
       "Bash(powershell \"Stop-Process -Name node -Force\")",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "Bash(git reset:*)",
+      "Bash(npm run lint:*)",
+      "mcp__supabase__get_logs",
+      "Bash(more:*)"
     ]
   }
 }

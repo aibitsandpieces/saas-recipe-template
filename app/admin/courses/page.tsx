@@ -1,4 +1,5 @@
 import { getCourses } from "@/lib/actions/course.actions"
+import { requirePlatformAdmin } from "@/lib/auth/user"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -14,6 +15,8 @@ import Link from "next/link"
 import { AdminActionDropdown } from "@/components/admin/AdminActionDropdown"
 
 export default async function CoursesPage() {
+  // Only platform admins can access courses
+  await requirePlatformAdmin()
   const courses = await getCourses()
 
   return (

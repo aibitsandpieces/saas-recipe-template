@@ -1,5 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { createSupabaseClient } from "../supabase";
+import { detectStaleJWT } from "./jwt-refresh";
+import { AuthenticationError } from "./auth-errors";
 
 /**
  * User context interface containing all relevant user information
@@ -11,6 +13,8 @@ export interface UserContext {
   organisationId: string | null;
   email: string | null;
   name: string | null;
+  firstName: string | null;
+  lastName: string | null;
   roles: string[];
 }
 
@@ -34,7 +38,7 @@ export async function getCurrentUser(): Promise<UserContext | null> {
 
   const supabase = await createSupabaseClient();
 
-  // Get user info with roles in a single optimized query using JOIN
+  // Step 1: Get basic user data (safe query, no nested relationships)
   const { data: userData, error: userError } = await supabase
     .from("users")
     .select(`
@@ -43,22 +47,46 @@ export async function getCurrentUser(): Promise<UserContext | null> {
       organisation_id,
       email,
       name,
-      user_roles!inner (
-        role:roles!inner (
-          name
-        )
-      )
+      first_name,
+      last_name
     `)
     .eq("clerk_id", userId)
     .single();
 
   if (userError || !userData) {
-    console.error("Error fetching user with roles:", userError);
+    console.error("Error fetching user:", {
+      error: userError,
+      userId,
+      message: userError?.message,
+      details: userError?.details,
+      hint: userError?.hint,
+      code: userError?.code
+    });
     return null;
   }
 
-  // Extract role names from the joined data
-  const roles = userData.user_roles?.map((ur: any) => ur.role?.name).filter(Boolean) || [];
+  // Step 2: Get user roles separately to avoid RLS circular reference
+  let roles: string[] = [];
+  try {
+    const { data: roleData, error: roleError } = await supabase
+      .from("user_roles")
+      .select(`role:roles(name)`)
+      .eq("user_id", userData.id);
+
+    if (roleError) {
+      console.warn("Could not fetch user roles:", {
+        error: roleError,
+        userId: userData.id,
+        message: roleError.message
+      });
+      // Continue with empty roles - user can still authenticate
+    } else {
+      roles = roleData?.map((ur: any) => ur.role?.name).filter(Boolean) || [];
+    }
+  } catch (roleError) {
+    console.warn("Exception fetching user roles:", roleError);
+    // Continue with empty roles - user can still authenticate
+  }
 
   return {
     id: userData.id,
@@ -66,8 +94,55 @@ export async function getCurrentUser(): Promise<UserContext | null> {
     organisationId: userData.organisation_id,
     email: userData.email,
     name: userData.name,
+    firstName: userData.first_name,
+    lastName: userData.last_name,
     roles: roles
   };
+}
+
+/**
+ * Enhanced getCurrentUser with stale JWT detection and fallback
+ */
+export async function getCurrentUserWithFallback(): Promise<UserContext | null> {
+  const user = await getCurrentUser()
+
+  if (!user) return null
+
+  // Get Clerk user for comparison
+  try {
+    const { userId } = await auth()
+    if (userId) {
+      try {
+        const clerk = await clerkClient()
+        const clerkUser = await clerk.users.getUser(userId)
+        const clerkRole = clerkUser.publicMetadata?.role as string
+
+        // Detect potential stale JWT
+        if (clerkRole && detectStaleJWT(clerkRole, user.roles)) {
+          console.warn(`Potential stale JWT detected. Clerk role: ${clerkRole}, DB roles: ${user.roles.join(', ')}`)
+
+          // For now, trust the database roles but log the discrepancy
+          // Future enhancement: implement proper token refresh or user re-authentication
+          return {
+            ...user,
+            // Add metadata about staleness for debugging
+            _metadata: {
+              staleJWT: true,
+              clerkRole,
+              lastChecked: new Date().toISOString()
+            }
+          } as UserContext & { _metadata?: any }
+        }
+      } catch (clerkError) {
+        console.warn('Failed to get Clerk user for staleness check:', clerkError)
+        // Continue without staleness detection
+      }
+    }
+  } catch (error) {
+    console.error('Error checking JWT staleness:', error)
+  }
+
+  return user
 }
 
 /**
@@ -167,8 +242,7 @@ export async function requirePlatformAdmin(): Promise<UserContext> {
 }
 
 /**
- * Require organisation admin privileges
- * Throws error if user is not an org admin
+ * Require organisation admin privileges with enhanced error handling
  */
 export async function requireOrgAdmin(): Promise<{
   user: UserContext;
@@ -176,8 +250,49 @@ export async function requireOrgAdmin(): Promise<{
 }> {
   const { user, organisationId } = await requireUserWithOrg();
 
-  if (!user.roles.includes("org_admin")) {
-    throw new Error("Forbidden: Organisation admin privileges required");
+  const hasOrgAdmin = user.roles.includes("org_admin")
+  const hasPlatformAdmin = user.roles.includes("platform_admin")
+
+  if (!hasOrgAdmin && !hasPlatformAdmin) {
+    // Check for potential stale JWT
+    try {
+      const { userId } = await auth()
+      if (userId) {
+        try {
+          const clerk = await clerkClient()
+          const clerkUser = await clerk.users.getUser(userId)
+          const clerkRole = clerkUser.publicMetadata?.role as string
+
+          if ((clerkRole === 'org_admin' || clerkRole === 'platform_admin') &&
+              !user.roles.includes(clerkRole)) {
+            throw new AuthenticationError(
+              'Access denied due to stale authentication token. Please sign out and sign back in.',
+              'STALE_JWT',
+              {
+                clerkRole,
+                databaseRoles: user.roles,
+                userId: user.clerkId
+              }
+            )
+          }
+        } catch (clerkError) {
+          console.warn('Failed to get Clerk user for stale JWT check:', clerkError)
+          // Continue without stale JWT detection
+        }
+      }
+    } catch (error) {
+      if (error instanceof AuthenticationError) throw error
+      console.error('Error checking stale JWT in requireOrgAdmin:', error)
+    }
+
+    throw new AuthenticationError(
+      'Forbidden: Organisation admin privileges required',
+      'INSUFFICIENT_PRIVILEGES',
+      {
+        userRoles: user.roles,
+        requiredRoles: ['org_admin', 'platform_admin']
+      }
+    )
   }
 
   return { user, organisationId };
@@ -208,6 +323,7 @@ export async function getOrganisationUsers(): Promise<UserContext[]> {
 
   const supabase = await createSupabaseClient();
 
+  // Step 1: Get basic user data
   const { data: users, error } = await supabase
     .from("users")
     .select(`
@@ -216,7 +332,8 @@ export async function getOrganisationUsers(): Promise<UserContext[]> {
       organisation_id,
       email,
       name,
-      user_roles(role:roles(name))
+      first_name,
+      last_name
     `)
     .eq("organisation_id", orgId);
 
@@ -225,12 +342,36 @@ export async function getOrganisationUsers(): Promise<UserContext[]> {
     throw new Error("Failed to fetch organisation users");
   }
 
-  return users?.map(user => ({
+  if (!users) return [];
+
+  // Step 2: Get roles for all users in a single query
+  const userIds = users.map(u => u.id);
+  const { data: roleData } = await supabase
+    .from("user_roles")
+    .select(`user_id, role:roles(name)`)
+    .in("user_id", userIds);
+
+  // Create a map of user_id -> roles for efficient lookup
+  const rolesMap = new Map<string, string[]>();
+  roleData?.forEach((ur: any) => {
+    const userId = ur.user_id;
+    const roleName = ur.role?.name;
+    if (roleName) {
+      if (!rolesMap.has(userId)) {
+        rolesMap.set(userId, []);
+      }
+      rolesMap.get(userId)!.push(roleName);
+    }
+  });
+
+  return users.map(user => ({
     id: user.id,
     clerkId: user.clerk_id,
     organisationId: user.organisation_id,
     email: user.email,
     name: user.name,
-    roles: user.user_roles?.map((ur: any) => ur.role?.name) || []
-  })) || [];
+    firstName: user.first_name,
+    lastName: user.last_name,
+    roles: rolesMap.get(user.id) || []
+  }));
 }

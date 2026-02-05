@@ -1,12 +1,15 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { requirePlatformAdmin } from "@/lib/auth/user"
+import { requireOrgAdmin } from "@/lib/auth/user"
+import { Breadcrumbs } from "@/components/Breadcrumbs"
 
 export default async function AdminReportsPage() {
-  // Only platform admins can access reports
-  await requirePlatformAdmin()
+  // Both platform admins and org admins can access reports
+  await requireOrgAdmin()
 
   return (
-    <div className="space-y-6">
+    <div className="container mx-auto px-4 py-8">
+      <Breadcrumbs />
+      <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
         <p className="mt-1 text-sm text-gray-500">
@@ -183,6 +186,7 @@ export default async function AdminReportsPage() {
           </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   )
 }

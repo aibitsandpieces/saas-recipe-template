@@ -153,7 +153,11 @@ export default function UserImportPage() {
 
       toast({
         title: "Success",
-        description: `Successfully processed ${result.successful_invitations} user invitations.`,
+        description: `Successfully processed ${result.successful_invitations} user invitations${
+          (result.existing_invitations_cleaned || 0) > 0
+            ? ` (${result.existing_invitations_cleaned} existing invitations replaced)`
+            : ''
+        }.`,
       })
     } catch (importError) {
       console.error('Import error:', importError)
@@ -209,7 +213,7 @@ bob.wilson@company.com,Bob Wilson,org_member,Company Inc,"Course 3"`
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-green-600">
                   {importResult?.successful_invitations || 0}
@@ -223,12 +227,28 @@ bob.wilson@company.com,Bob Wilson,org_member,Company Inc,"Course 3"`
                 <div className="text-sm text-gray-500">Failed Invitations</div>
               </div>
               <div className="text-center">
+                <div className="text-2xl font-bold text-orange-600">
+                  {importResult?.existing_invitations_cleaned || 0}
+                </div>
+                <div className="text-sm text-gray-500">Existing Invitations Replaced</div>
+              </div>
+              <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">
                   {importResult?.individual_enrollments || 0}
                 </div>
                 <div className="text-sm text-gray-500">Course Enrollments</div>
               </div>
             </div>
+
+            {(importResult?.existing_invitations_cleaned || 0) > 0 && (
+              <Alert className="border-orange-200 bg-orange-50">
+                <AlertCircle className="h-4 w-4 text-orange-600" />
+                <AlertDescription className="text-orange-800">
+                  <strong>Duplicate Handling:</strong> {importResult.existing_invitations_cleaned} users already had pending invitations.
+                  Their previous invitations were revoked and replaced with fresh ones containing the updated information.
+                </AlertDescription>
+              </Alert>
+            )}
 
             {importResult?.failed_invitations > 0 && (
               <Alert>
@@ -383,12 +403,11 @@ bob.wilson@company.com,Bob Wilson,org_member,Company Inc,"Course 3"`
                   {isImporting ? (
                     <>
                       <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Creating {preview.summary.organisationsToCreate.length} organizations and inviting {preview.summary.usersToInvite} users...
+                      Inviting {preview.summary.usersToInvite} users...
                     </>
                   ) : (
                     <>
                       <UserPlus className="h-4 w-4 mr-2" />
-                      {preview.summary.organisationsToCreate.length > 0 && `Create ${preview.summary.organisationsToCreate.length} Organizations & `}
                       Invite {preview.summary.usersToInvite} Users
                     </>
                   )}
@@ -454,19 +473,6 @@ bob.wilson@company.com,Bob Wilson,org_member,Company Inc,"Course 3"`
                   </div>
                 </div>
 
-{preview.summary.organisationsToCreate.length > 0 && (
-                  <Alert className="border-blue-200 bg-blue-50">
-                    <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <AlertDescription className="text-blue-800">
-                      <strong>New Organizations:</strong> The following organizations will be created during import:
-                      <ul className="list-disc list-inside mt-1">
-                        {preview.summary.organisationsToCreate.map(org => (
-                          <li key={org}>{org}</li>
-                        ))}
-                      </ul>
-                    </AlertDescription>
-                  </Alert>
-                )}
 
                 {preview.summary.organisationsFound.length > 0 && (
                   <div>

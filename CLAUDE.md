@@ -8,6 +8,36 @@ This is a **production-ready multi-tenant SaaS template** that provides a comple
 
 **Template Nature**: This includes a "Recipe Emporium" example to demonstrate the multi-tenant patterns, but it's designed to be customized for any business domain.
 
+## Known Issues & Development Notes
+
+### 🐛 Sign-up Name Field Collection Issue (Localhost Development)
+
+**Issue**: Clerk sign-up form not displaying first_name/last_name fields during user registration in localhost development.
+
+**Symptoms**:
+- Sign-up form only shows email/password fields
+- Database errors: "Error fetching user with roles: Cannot coerce the result to a single JSON object (0 rows)"
+- Users exist in Clerk but not properly synced to Supabase database
+
+**Root Cause**:
+- Clerk Dashboard user attributes not configured for first_name/last_name collection
+- Potential localhost webhook delivery issues affecting user sync
+- Related database query errors when user records are incomplete
+
+**Status**: ⚠️ **Known bug documented for production investigation**
+
+**Workaround for Testing**:
+- Configure Clerk Dashboard manually: User & Authentication → User Attributes → Add required first_name/last_name fields
+- Verify webhook URLs are accessible in production environment
+- Monitor webhook delivery logs for sync failures
+
+**Production Notes**:
+- This issue may resolve automatically in production with proper webhook delivery
+- Ensure Clerk webhook endpoints are publicly accessible (not localhost)
+- Verify JWT token claims include proper user metadata after successful sign-up
+
+---
+
 ## Development Commands
 
 ```bash

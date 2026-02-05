@@ -275,7 +275,7 @@ async function executeImportTransaction(
   let departmentsCreated = 0
   let workflowsCreated = 0
   let successfulRows = 0
-  let failedRows = 0
+  const failedRows = 0
   const errors: ImportError[] = []
 
   // Create maps to store created categories and departments

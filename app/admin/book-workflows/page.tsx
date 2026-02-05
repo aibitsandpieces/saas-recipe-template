@@ -2,11 +2,15 @@ import { Suspense } from "react"
 import { Book, FileText, FolderOpen, Target, Upload, Trash2, AlertTriangle } from "lucide-react"
 import Link from "next/link"
 import { getBookWorkflowStatistics } from "@/lib/actions/book-workflow.actions"
+import { requirePlatformAdmin } from "@/lib/auth/user"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { DeleteAllBookWorkflowDataButton } from "@/components/book-workflows/DeleteAllBookWorkflowDataButton"
 
 async function BookWorkflowAdminContent() {
+  // Only platform admins can access book workflows
+  await requirePlatformAdmin()
+
   const stats = await getBookWorkflowStatistics()
 
   return (

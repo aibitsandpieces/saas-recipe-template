@@ -193,6 +193,7 @@ export interface WorkflowCategoryWithDepartments extends WorkflowCategory {
 export interface UserInvitation {
   id?: string;
   email: string;
+  name?: string; // NEW - from CSV import
   organisation_id: string;
   role_name: 'org_admin' | 'org_member';
   status: 'pending' | 'accepted' | 'expired' | 'failed';
@@ -224,7 +225,9 @@ export interface UserWithRole {
   id: string;
   clerk_id: string;
   email?: string;
-  name?: string;
+  name?: string; // Keep for backward compatibility
+  first_name?: string; // NEW
+  last_name?: string; // NEW
   organisation_id?: string;
   created_at?: string;
   updated_at?: string;
@@ -259,7 +262,6 @@ export interface UserImportPreviewResult {
   summary: {
     usersToInvite: number;
     organisationsFound: string[];
-    organisationsToCreate: string[];  // NEW - organizations that will be created
     coursesFound: string[];
     rolesAssigned: { [role: string]: number };
     duplicateEmails: string[];
@@ -274,8 +276,8 @@ export interface UserImportLog {
   successful_invitations: number;
   failed_invitations: number;
   organisations_processed: number;
-  organisations_created: number;      // NEW - count of orgs created
   individual_enrollments: number;
+  existing_invitations_cleaned?: number; // NEW - count of existing invitations cleaned up
   error_summary?: any;
   imported_by?: string;
   started_at?: string;
@@ -427,6 +429,15 @@ export interface BookWorkflowImportLog {
   importerName?: string;
   duration?: number;
   status?: 'pending' | 'completed' | 'failed';
+}
+
+// User Invitation Creation Interface
+export interface CreateUserInvitation {
+  email: string;
+  name?: string; // NEW - optional name field
+  organisationId: string;
+  role: 'org_admin' | 'org_member';
+  courseIds?: string[];
 }
 
 // Book Workflow Search and Filter Types

@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { NextResponse } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -8,7 +9,16 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks/clerk"
 ]);
 
-export default clerkMiddleware((auth, request) => {
+export default clerkMiddleware(async (auth, request) => {
+  const { userId } = await auth();
+  const isSignedIn = !!userId;
+  const { pathname } = request.nextUrl;
+
+  // Redirect signed-in users from "/" to "/dashboard"
+  if (isSignedIn && pathname === "/") {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
+  }
+
   // Don't protect public routes
   if (isPublicRoute(request)) {
     return;
