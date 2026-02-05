@@ -178,6 +178,11 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
   const supabaseAdmin = createSupabaseAdmin()
   const clerk = await clerkClient()
 
+  // Validate environment configuration
+  if (!process.env.NEXT_PUBLIC_SITE_URL) {
+    throw new Error('NEXT_PUBLIC_SITE_URL environment variable is required')
+  }
+
   // Re-validate data
   const preview = await previewUserImport(csvData)
   if (!preview.isValid) {
@@ -192,9 +197,8 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
     organisations_processed: 0,
     organisations_created: 0,  // NEW
     individual_enrollments: 0,
-    imported_by: user.clerkId,
-    started_at: new Date().toISOString(),
-    status: 'pending'
+    imported_by: user.id, // Fixed: Use user.id (UUID) instead of user.clerkId (string)
+    started_at: new Date().toISOString()
   }
 
   try {
@@ -243,6 +247,7 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
     }
 
     const createdInvitations: { clerkId: string, supabaseId?: string }[] = []
+    const failedInvitations: { email: string, error: string }[] = []
 
     try {
       for (const batch of batches) {
@@ -270,15 +275,74 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
               }
             }
 
+            // Check for existing Clerk invitations and revoke them first
+            try {
+              const existingClerkInvitations = await clerk.invitations.getInvitationList({
+                status: 'pending'
+              })
+
+              // Filter by email address and revoke any existing invitations
+              const matchingInvitations = existingClerkInvitations.data.filter(
+                invitation => invitation.emailAddress === email
+              )
+
+              if (matchingInvitations.length > 0) {
+                console.log(`Found ${matchingInvitations.length} existing invitation(s) for ${email}`)
+
+                for (const existingInvitation of matchingInvitations) {
+                  try {
+                    await clerk.invitations.revokeInvitation(existingInvitation.id)
+                    console.log(`Revoked existing invitation ${existingInvitation.id} for ${email}`)
+                  } catch (revokeError) {
+                    console.error(`Failed to revoke invitation ${existingInvitation.id} for ${email}:`, revokeError)
+                    // Continue anyway - might be already revoked
+                  }
+                }
+              }
+            } catch (checkError: any) {
+              console.error(`Failed to check existing invitations for ${email}:`, checkError)
+              // Continue anyway - this is not critical for the flow
+            }
+
             // Create Clerk invitation with metadata
-            const clerkInvitation = await clerk.invitations.createInvitation({
-              emailAddress: email,
-              publicMetadata: {
-                organisation_id: org.id,
-                role: row.role
-              },
-              redirectUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/sign-up`
-            })
+            let clerkInvitation
+            try {
+              clerkInvitation = await clerk.invitations.createInvitation({
+                emailAddress: email,
+                publicMetadata: {
+                  organisation_id: org.id,
+                  role: row.role
+                },
+                redirectUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/sign-up`
+              })
+            } catch (clerkError: any) {
+              // Log detailed Clerk error information
+              console.error(`Clerk invitation failed for ${email}:`, {
+                status: clerkError.status,
+                code: clerkError.code,
+                message: clerkError.message,
+                errors: clerkError.errors, // This will show the actual validation errors
+                clerkTraceId: clerkError.clerkTraceId
+              })
+
+              // Create a more detailed error message
+              let errorDetails = `Clerk API error (${clerkError.status})`
+              if (clerkError.errors && Array.isArray(clerkError.errors)) {
+                const errorMessages = clerkError.errors.map((err: any) => `${err.code}: ${err.message}`).join(', ')
+                errorDetails = `${errorDetails}: ${errorMessages}`
+              }
+
+              throw new Error(`Failed to create Clerk invitation for ${email}: ${errorDetails}`)
+            }
+
+            // Validate Clerk invitation was created successfully
+            if (!clerkInvitation || !clerkInvitation.id) {
+              throw new Error(`Failed to create Clerk invitation for ${email}: No invitation ID returned`)
+            }
+
+            console.log(`Creating invitation for ${email} with status: pending`)
+            console.log(`Clerk invitation ID: ${clerkInvitation.id}`)
+            console.log(`Redirect URL: ${process.env.NEXT_PUBLIC_SITE_URL}/sign-up`)
 
             try {
               // Create invitation record in Supabase
@@ -288,18 +352,24 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
                   email: email,
                   organisation_id: org.id,
                   role_name: row.role,
+                  status: 'pending',
                   clerk_invitation_id: clerkInvitation.id,
                   courses: courseIds,
                   invited_by: user.id,
                   expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
                 })
-                .select('id')
+                .select('id, status')
                 .single()
 
               if (invitationError) {
                 // Clean up Clerk invitation if Supabase insert failed
                 await clerk.invitations.revokeInvitation(clerkInvitation.id)
                 throw new Error(`Failed to create invitation record: ${invitationError.message}`)
+              }
+
+              // Verify status was set correctly
+              if (invitation && invitation.status !== 'pending') {
+                console.warn(`Warning: Invitation ${invitation.id} has unexpected status: ${invitation.status}`)
               }
 
               return {
@@ -321,7 +391,10 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
         )
 
         // Process batch results
-        for (const result of batchResults) {
+        for (let i = 0; i < batchResults.length; i++) {
+          const result = batchResults[i]
+          const batchEmail = batch[i]?.email || 'unknown'
+
           if (result.status === 'fulfilled') {
             importLog.successful_invitations++
             createdInvitations.push({
@@ -329,8 +402,12 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
               supabaseId: result.value.supabaseId
             })
           } else {
-            console.error(`Batch invitation failed:`, result.reason)
+            console.error(`Batch invitation failed for ${batchEmail}:`, result.reason)
             importLog.failed_invitations++
+            failedInvitations.push({
+              email: batchEmail,
+              error: result.reason?.message || 'Unknown error'
+            })
           }
         }
       }
@@ -362,7 +439,6 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
     importLog.organisations_processed = processedOrgs.size
     importLog.individual_enrollments = totalIndividualEnrollments
     importLog.completed_at = new Date().toISOString()
-    importLog.status = 'completed'
 
     // Save import log
     const { error: logError } = await supabaseAdmin
@@ -371,7 +447,8 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
         ...importLog,
         error_summary: importLog.failed_invitations > 0 ? {
           failed_count: importLog.failed_invitations,
-          message: 'Some invitations failed to process'
+          message: 'Some invitations failed to process',
+          failed_emails: failedInvitations.map(f => `${f.email}: ${f.error}`).join('; ')
         } : null
       })
 
@@ -379,16 +456,31 @@ export async function executeUserImport(csvData: CSVUserRow[], fileName: string)
       console.error("Failed to save import log:", logError)
     }
 
+    // If there were failures, add details to the import log for the UI
+    if (failedInvitations.length > 0) {
+      console.log("Failed invitations details:", failedInvitations)
+      // Add failed invitation details to the return object for UI display
+      ;(importLog as any).failedInvitationDetails = failedInvitations
+    }
+
     return importLog
 
   } catch (error) {
-    // NEW: Enhanced error handling for organization creation
-    importLog.status = 'failed'
+    // Enhanced error handling for organization creation
     importLog.completed_at = new Date().toISOString()
     importLog.error_summary = {
       message: error instanceof Error ? error.message : 'Unknown error occurred',
       organisations_created: importLog.organisations_created,
       stack: error instanceof Error ? error.stack : undefined
+    }
+
+    // Try to save error log if possible
+    try {
+      await supabaseAdmin
+        .from("user_import_logs")
+        .insert(importLog)
+    } catch (logError) {
+      console.error("Failed to save error import log:", logError)
     }
 
     throw error
@@ -527,6 +619,11 @@ export async function inviteUser(invitation: {
   const supabaseAdmin = createSupabaseAdmin()
   const clerk = await clerkClient()
 
+  // Validate environment configuration
+  if (!process.env.NEXT_PUBLIC_SITE_URL) {
+    throw new Error('NEXT_PUBLIC_SITE_URL environment variable is required')
+  }
+
   try {
 
     // Check if user already exists or has pending invitation
@@ -551,15 +648,74 @@ export async function inviteUser(invitation: {
       throw new Error('User already has a pending invitation')
     }
 
+    // Check for existing Clerk invitations and revoke them first
+    try {
+      const existingClerkInvitations = await clerk.invitations.getInvitationList({
+        status: 'pending'
+      })
+
+      // Filter by email address and revoke any existing invitations
+      const matchingInvitations = existingClerkInvitations.data.filter(
+        existing => existing.emailAddress === invitation.email
+      )
+
+      if (matchingInvitations.length > 0) {
+        console.log(`Found ${matchingInvitations.length} existing invitation(s) for ${invitation.email}`)
+
+        for (const existingInvitation of matchingInvitations) {
+          try {
+            await clerk.invitations.revokeInvitation(existingInvitation.id)
+            console.log(`Revoked existing invitation ${existingInvitation.id} for ${invitation.email}`)
+          } catch (revokeError) {
+            console.error(`Failed to revoke invitation ${existingInvitation.id} for ${invitation.email}:`, revokeError)
+            // Continue anyway - might be already revoked
+          }
+        }
+      }
+    } catch (checkError: any) {
+      console.error(`Failed to check existing invitations for ${invitation.email}:`, checkError)
+      // Continue anyway - this is not critical for the flow
+    }
+
     // Create Clerk invitation
-    const clerkInvitation = await clerk.invitations.createInvitation({
-      emailAddress: invitation.email,
-      publicMetadata: {
-        organisation_id: invitation.organisationId,
-        role: invitation.role
-      },
-      redirectUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/sign-up`
-    })
+    let clerkInvitation
+    try {
+      clerkInvitation = await clerk.invitations.createInvitation({
+        emailAddress: invitation.email,
+        publicMetadata: {
+          organisation_id: invitation.organisationId,
+          role: invitation.role
+        },
+        redirectUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/sign-up`
+      })
+    } catch (clerkError: any) {
+      // Log detailed Clerk error information
+      console.error(`Clerk invitation failed for ${invitation.email}:`, {
+        status: clerkError.status,
+        code: clerkError.code,
+        message: clerkError.message,
+        errors: clerkError.errors, // This will show the actual validation errors
+        clerkTraceId: clerkError.clerkTraceId
+      })
+
+      // Create a more detailed error message
+      let errorDetails = `Clerk API error (${clerkError.status})`
+      if (clerkError.errors && Array.isArray(clerkError.errors)) {
+        const errorMessages = clerkError.errors.map((err: any) => `${err.code}: ${err.message}`).join(', ')
+        errorDetails = `${errorDetails}: ${errorMessages}`
+      }
+
+      throw new Error(`Failed to create Clerk invitation for ${invitation.email}: ${errorDetails}`)
+    }
+
+    // Validate Clerk invitation was created successfully
+    if (!clerkInvitation || !clerkInvitation.id) {
+      throw new Error(`Failed to create Clerk invitation for ${invitation.email}: No invitation ID returned`)
+    }
+
+    console.log(`Creating invitation for ${invitation.email} with status: pending`)
+    console.log(`Clerk invitation ID: ${clerkInvitation.id}`)
+    console.log(`Redirect URL: ${process.env.NEXT_PUBLIC_SITE_URL}/sign-up`)
 
     // Create invitation record
     const { data: invitationRecord, error } = await supabaseAdmin
@@ -568,6 +724,7 @@ export async function inviteUser(invitation: {
         email: invitation.email.toLowerCase(),
         organisation_id: invitation.organisationId,
         role_name: invitation.role,
+        status: 'pending',
         clerk_invitation_id: clerkInvitation.id,
         courses: invitation.courseIds || [],
         invited_by: user.id,
@@ -584,6 +741,11 @@ export async function inviteUser(invitation: {
         console.error('Failed to revoke Clerk invitation:', revokeError)
       }
       throw new Error(`Failed to create invitation: ${error.message}`)
+    }
+
+    // Verify status was set correctly
+    if (invitationRecord && invitationRecord.status !== 'pending') {
+      console.warn(`Warning: Invitation ${invitationRecord.id} has unexpected status: ${invitationRecord.status}`)
     }
 
     return invitationRecord
@@ -797,5 +959,120 @@ export async function getInvitations(filters: {
       hasNextPage: page < totalPages,
       hasPreviousPage: page > 1
     }
+  }
+}
+
+/**
+ * Get user by ID
+ */
+export async function getUserById(userId: string): Promise<UserWithRole | null> {
+  await requirePlatformAdmin()
+  const supabase = await createSupabaseClient()
+
+  const { data: user, error } = await supabase
+    .from("users")
+    .select(`
+      *,
+      user_roles(role:roles(name)),
+      organisation:organisations(name)
+    `)
+    .eq("id", userId)
+    .single()
+
+  if (error || !user) {
+    return null
+  }
+
+  return {
+    ...user,
+    role: user.user_roles?.[0]?.role?.name || 'org_member',
+    organisationName: user.organisation?.name,
+    courseEnrollments: []
+  }
+}
+
+/**
+ * Delete user (platform admin only)
+ */
+export async function deleteUser(
+  userId: string,
+  userEmail: string,
+  confirmation: { email: string }
+): Promise<{ success: boolean; message: string }> {
+  // Require platform admin
+  await requirePlatformAdmin()
+
+  const supabaseAdmin = createSupabaseAdmin()
+  const clerk = await clerkClient()
+
+  // Verify email confirmation matches exactly
+  if (confirmation.email !== userEmail) {
+    throw new Error('Email confirmation does not match')
+  }
+
+  try {
+    // Get user details
+    const user = await getUserById(userId)
+    if (!user) {
+      throw new Error('User not found')
+    }
+
+    // Prevent deleting platform admins to avoid lockout
+    if (user.role === 'platform_admin') {
+      throw new Error('Cannot delete platform administrators')
+    }
+
+    // Try to delete from Clerk first, but handle case where user doesn't exist in Clerk
+    try {
+      await clerk.users.deleteUser(user.clerk_id)
+      console.log(`Successfully deleted user from Clerk: ${user.clerk_id}`)
+    } catch (clerkError: any) {
+      // If user doesn't exist in Clerk, that's okay - continue with Supabase cleanup
+      if (clerkError?.status === 404 || clerkError?.message?.includes('not_found') || clerkError?.message?.includes('Not Found')) {
+        console.log(`User ${user.clerk_id} not found in Clerk, continuing with Supabase cleanup`)
+      } else {
+        // Re-throw other Clerk errors
+        throw clerkError
+      }
+    }
+
+    // Manual cleanup - delete user from Supabase directly since webhook might not trigger
+    // Delete invitations created by this user first
+    await supabaseAdmin
+      .from("user_invitations")
+      .delete()
+      .eq("invited_by", userId)
+
+    // Delete user roles (should cascade automatically but being explicit)
+    await supabaseAdmin
+      .from("user_roles")
+      .delete()
+      .eq("user_id", userId)
+
+    // Delete course enrollments (should cascade automatically but being explicit)
+    await supabaseAdmin
+      .from("course_user_enrollments")
+      .delete()
+      .eq("user_id", userId)
+
+    // Finally delete the user record
+    const { error: userDeleteError } = await supabaseAdmin
+      .from("users")
+      .delete()
+      .eq("id", userId)
+
+    if (userDeleteError) {
+      throw new Error(`Failed to delete user from database: ${userDeleteError.message}`)
+    }
+
+    return {
+      success: true,
+      message: `User ${userEmail} deleted successfully`
+    }
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    console.error('Delete user error:', error)
+    throw new Error(`Failed to delete user: ${errorMessage}`)
   }
 }
