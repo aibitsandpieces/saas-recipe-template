@@ -1,12 +1,20 @@
 import { auth } from "@clerk/nextjs/server";
 import { getCurrentUser } from "@/lib/auth/user";
 import { checkSyncStatus, manualUserSync } from "@/lib/auth/manual-sync";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default async function AuthTestPage() {
   const { userId } = await auth();
   const user = await getCurrentUser();
+
+  // Debug pages should be admin-only in production
+  if (process.env.NODE_ENV === 'production' &&
+      (!user || !user.roles.includes("platform_admin"))) {
+    redirect("/dashboard")
+  }
+
   const syncStatus = await checkSyncStatus();
 
   async function handleManualSync() {

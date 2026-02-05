@@ -1,6 +1,16 @@
 import { createSupabaseClient } from "@/lib/supabase"
+import { getCurrentUser } from "@/lib/auth/user"
+import { redirect } from "next/navigation"
 
 export default async function DebugEnrollmentsPage() {
+  const user = await getCurrentUser()
+
+  // Debug pages should be admin-only in production
+  if (process.env.NODE_ENV === 'production' &&
+      (!user || !user.roles.includes("platform_admin"))) {
+    redirect("/dashboard")
+  }
+
   const supabase = await createSupabaseClient()
 
   // Get all organizations

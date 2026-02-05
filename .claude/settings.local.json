@@ -100,7 +100,8 @@
       "mcp__supabase__get_logs",
       "Bash(more:*)",
       "Bash(npm run dev:check:*)",
-      "Bash(npm run dev:clean:*)"
+      "Bash(npm run dev:clean:*)",
+      "Bash(tree:*)"
     ]
   }
 }

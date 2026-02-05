@@ -1,7 +1,14 @@
 import { getCurrentUser } from "@/lib/auth/user"
+import { redirect } from "next/navigation"
 
 export default async function DebugPage() {
   const user = await getCurrentUser()
+
+  // Debug pages should be admin-only in production
+  if (process.env.NODE_ENV === 'production' &&
+      (!user || !user.roles.includes("platform_admin"))) {
+    redirect("/dashboard")
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
