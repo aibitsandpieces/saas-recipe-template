@@ -4,7 +4,10 @@
   "description": "Production-ready multi-tenant SaaS foundation with 3-role RBAC, organization isolation, and Clerk + Supabase integration",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port 3002",
+    "dev": "node scripts/dev-server.js",
+    "dev:check": "node scripts/port-utils.js check",
+    "dev:clean": "node scripts/port-utils.js clean",
+    "dev:force": "node scripts/dev-server.js --force",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."

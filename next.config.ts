@@ -10,6 +10,11 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "20mb",
     },
   },
+  // Ensure PORT environment variable is respected
+  env: {
+    PORT: process.env.PORT,
+    DEV_PORT: process.env.DEV_PORT,
+  },
 };
 
 export default nextConfig;

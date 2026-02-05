@@ -98,7 +98,9 @@
       "Bash(git reset:*)",
       "Bash(npm run lint:*)",
       "mcp__supabase__get_logs",
-      "Bash(more:*)"
+      "Bash(more:*)",
+      "Bash(npm run dev:check:*)",
+      "Bash(npm run dev:clean:*)"
     ]
   }
 }
